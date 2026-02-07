@@ -1,0 +1,11 @@
+[package]
+name = "schema"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "./src/lib.rs"
+
+[dependencies]
+tree-sitter = "0.26.5"
+tree-sitter-python = "0.25.0"
