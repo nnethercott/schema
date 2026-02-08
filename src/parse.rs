@@ -8,7 +8,7 @@ use std::fmt::Display;
 use ouroboros::self_referencing;
 use tree_sitter::{Node, Query, QueryCursor, QueryMatches, StreamingIterator};
 
-fn build_py_query(s_expr: &'static str) -> Query {
+pub fn build_py_query(s_expr: &'static str) -> Query {
     let lang = tree_sitter_python::LANGUAGE.into();
     Query::new(&lang, s_expr).unwrap()
 }
@@ -44,8 +44,7 @@ impl<'a, 'tree> Noeud<'a, 'tree> {
         unsafe { str::from_utf8_unchecked(self.ctx) }
     }
 
-    pub fn parse(&self, s_expr: &'static str) -> NoeudIter<'a, 'tree> {
-        let query = build_py_query(s_expr);
+    pub fn parse(&self, query: &'a Query) -> NoeudIter<'a, 'tree> {
         NoeudIter::new(query, self.clone())
     }
 }
@@ -56,7 +55,7 @@ where
     'tree: 'a,
 {
     ctx: &'a [u8],
-    query: Query,
+    query: &'a Query,
     builder: QueryCursor,
 
     #[borrows(mut builder, query)]
@@ -66,11 +65,11 @@ where
 
 pub struct NoeudIter<'a, 'tree> {
     inner: NoeudIterInner<'a, 'tree>,
-    buffer: std::vec::IntoIter<(String, Noeud<'a, 'tree>)>,
+    buffer: std::vec::IntoIter<(&'a str, Noeud<'a, 'tree>)>,
 }
 
 impl<'a, 'tree> NoeudIter<'a, 'tree> {
-    pub fn new(query: Query, node: Noeud<'a, 'tree>) -> Self {
+    pub fn new(query: &'a Query, node: Noeud<'a, 'tree>) -> Self {
         let Noeud { node, ctx } = node;
 
         let inner = NoeudIterInnerBuilder {
@@ -90,7 +89,7 @@ impl<'a, 'tree> NoeudIter<'a, 'tree> {
 
 impl<'a, 'tree> Iterator for NoeudIter<'a, 'tree> {
     // (capture_group_id, node) pairs
-    type Item = (String, Noeud<'a, 'tree>);
+    type Item = (&'a str, Noeud<'a, 'tree>);
 
     fn next(&mut self) -> Option<Self::Item> {
         // drain buffer
@@ -99,12 +98,11 @@ impl<'a, 'tree> Iterator for NoeudIter<'a, 'tree> {
         }
 
         let ctx = *self.inner.borrow_ctx();
-        let names: Vec<_> = self
+        let group_names: Vec<_> = self
             .inner
             .borrow_query()
             .capture_names()
             .iter()
-            .map(|s| s.to_string())
             .collect();
 
         self.inner.with_cursor_mut(|cur| {
@@ -115,8 +113,8 @@ impl<'a, 'tree> Iterator for NoeudIter<'a, 'tree> {
                     .map(|item| {
                         let node = item.node;
                         let slice = &ctx[node.start_byte()..node.end_byte()];
-                        let which = names[item.index as usize].clone();
-                        (which.to_string(), Noeud::new(node, slice))
+                        let group = group_names[item.index as usize];
+                        (*group, Noeud::new(node, slice))
                     })
                     .collect::<Vec<_>>()
                     .into_iter();

@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use schema::parse::Noeud;
+use schema::parse::{Noeud, build_py_query};
 use tree_sitter::Parser;
 
 fn main() {
@@ -46,7 +46,8 @@ def nate():
     //     "#;
 
     let now = Instant::now();
-    let parsed: Vec<_> = root.parse(query).collect();
+    let query = build_py_query(query);
+    let parsed: Vec<_> = root.parse(&query).collect();
     println!("{:?}", now.elapsed());
 
     for (label, node) in parsed {
