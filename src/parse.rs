@@ -6,7 +6,7 @@
 use std::fmt::Display;
 
 use ouroboros::self_referencing;
-use tree_sitter::{Node, Query, QueryCursor, QueryMatches, StreamingIterator, TextProvider};
+use tree_sitter::{Node, Query, QueryCursor, QueryMatches, StreamingIterator};
 
 fn build_py_query(s_expr: &'static str) -> Query {
     let lang = tree_sitter_python::LANGUAGE.into();
@@ -46,20 +46,12 @@ impl<'a, 'tree> Noeud<'a, 'tree> {
 
     pub fn parse(&self, s_expr: &'static str) -> NoeudIter<'a, 'tree> {
         let query = build_py_query(s_expr);
-        let (node, ctx) = (self.node, self.ctx);
-
-        NoeudIterBuilder {
-            query,
-            ctx,
-            builder: QueryCursor::new(),
-            cursor_builder: |builder, q| builder.matches(q, node, ctx),
-        }
-        .build()
+        NoeudIter::new(query, self.clone())
     }
 }
 
 #[self_referencing]
-pub struct NoeudIter<'a, 'tree>
+pub struct NoeudIterInner<'a, 'tree>
 where
     'tree: 'a,
 {
@@ -67,27 +59,70 @@ where
     query: Query,
     builder: QueryCursor,
 
-    // FIXME: later unpack this...
     #[borrows(mut builder, query)]
     #[not_covariant]
     cursor: QueryMatches<'this, 'tree, &'a [u8], &'a [u8]>,
 }
 
-// TODO: turn on proc macros to see types later
+pub struct NoeudIter<'a, 'tree> {
+    inner: NoeudIterInner<'a, 'tree>,
+    buffer: std::vec::IntoIter<(String, Noeud<'a, 'tree>)>,
+}
+
+impl<'a, 'tree> NoeudIter<'a, 'tree> {
+    pub fn new(query: Query, node: Noeud<'a, 'tree>) -> Self {
+        let Noeud { node, ctx } = node;
+
+        let inner = NoeudIterInnerBuilder {
+            query,
+            ctx,
+            builder: QueryCursor::new(),
+            cursor_builder: |builder, q| builder.matches(q, node, ctx),
+        }
+        .build();
+
+        Self {
+            inner,
+            buffer: vec![].into_iter(),
+        }
+    }
+}
+
 impl<'a, 'tree> Iterator for NoeudIter<'a, 'tree> {
-    type Item = Noeud<'a, 'tree>;
+    // (capture_group_id, node) pairs
+    type Item = (String, Noeud<'a, 'tree>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ctx = *self.borrow_ctx();
+        // drain buffer
+        if let Some(item) = self.buffer.next() {
+            return Some(item);
+        }
 
-        self.with_cursor_mut(|cur| {
-            if let Some(item) = cur.next() {
-                let node = item.captures[0].node;
-                let slice = &ctx[node.start_byte()..node.end_byte()];
-                Some(Noeud::new(node, slice))
-            } else {
-                None
-            }
-        })
+        let ctx = *self.inner.borrow_ctx();
+        let names: Vec<_> = self
+            .inner
+            .borrow_query()
+            .capture_names()
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        self.inner.with_cursor_mut(|cur| {
+            if let Some(matches) = cur.next() {
+                self.buffer = matches
+                    .captures
+                    .iter()
+                    .map(|item| {
+                        let node = item.node;
+                        let slice = &ctx[node.start_byte()..node.end_byte()];
+                        let which = names[item.index as usize].clone();
+                        (which.to_string(), Noeud::new(node, slice))
+                    })
+                    .collect::<Vec<_>>()
+                    .into_iter();
+            };
+        });
+
+        self.buffer.next()
     }
 }

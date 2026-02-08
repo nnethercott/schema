@@ -41,15 +41,15 @@ def nate():
         "bar"))@body
     "#;
 
-//     let query = r#"
-// (function_definition (_))@nate
-//     "#;
+    //     let query = r#"
+    // (function_definition (_))@nate
+    //     "#;
 
     let now = Instant::now();
     let parsed: Vec<_> = root.parse(query).collect();
     println!("{:?}", now.elapsed());
 
-    for node in parsed {
-        println!("{}", node);
+    for (label, node) in parsed {
+        println!("label: '{}'\n{}", label, node);
     }
 }
