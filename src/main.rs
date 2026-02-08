@@ -1,41 +1,38 @@
-use std::time::Instant;
-use schema::{s_expr, parse::{build_py_query}};
+use ignore::DirEntry;
+use schema::crawl::{CrawlOpts, Crawler};
 use schema::parse::Noeud;
+use schema::{parse::build_query, s_expr};
+use std::fs::File;
+use std::io::Read;
+use std::time::Instant;
 use tree_sitter::Parser;
 
 fn main() {
+    let now = Instant::now();
+
+    let crawler = Crawler::new(CrawlOpts::default());
+    crawler.crawl(tree_sitter_parse);
+
+    println!("{:?}", now.elapsed());
+}
+
+/// Applies to each file in the glob **/*.py
+/// builds AST and extracts decorator definitions
+fn tree_sitter_parse(e: &DirEntry) {
+    let mut f = File::open(e.path()).unwrap();
+
     let mut parser = Parser::new();
     let lang = tree_sitter_python::LANGUAGE.into();
     parser.set_language(&lang).unwrap();
 
-    let source_code = r#"
-def foo(arg: Any):
-    def decorator(f: Callable):
-        def _decorator(*args, **kwargs):
-            print(arg)
-            print(f(*args, **kwargs))
-        return _decorator
+    let mut buf = vec![];
+    f.read_to_end(&mut buf).unwrap();
+    let tree = parser.parse(&buf, None).unwrap();
+    let root = Noeud::new(tree.root_node(), &buf);
 
-    return decorator
-
-@foo(42)
-def nate():
-    print("hi")
-
-@foo
-def jack():
-    pass
-    "#;
-
-    let tree = parser.parse(source_code, None).unwrap();
-    let root = Noeud::new(tree.root_node(), source_code.as_bytes());
-
-    let now = Instant::now();
-    let query = build_py_query(&s_expr!("foo","bar"));
-    let parsed: Vec<_> = root.parse(&query).collect();
-    println!("{:?}", now.elapsed());
-
-    for item in parsed {
-        dbg!(item);
+    let query = build_query(&s_expr!("foo", "bar"));
+    let mut hits = root.parse(&query);
+    while let Some(entry) = hits.next() {
+        dbg!(entry);
     }
 }

@@ -1,4 +1,4 @@
-// FIXME: use fuzzy matching with a `#match?` statement ?
+// TODO: use fuzzy matching with a `#match?` statement ?
 #[macro_export]
 macro_rules! s_expr {
     ($($d:literal),*) => {
