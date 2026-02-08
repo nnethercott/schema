@@ -5,52 +5,89 @@
 
 use std::fmt::Display;
 
-use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
+use ouroboros::self_referencing;
+use tree_sitter::{Node, Query, QueryCursor, QueryMatches, StreamingIterator, TextProvider};
 
-#[derive(Debug)]
-pub struct NodeLike<'a, 'tree> {
+fn build_py_query(s_expr: &'static str) -> Query {
+    let lang = tree_sitter_python::LANGUAGE.into();
+    Query::new(&lang, s_expr).unwrap()
+}
+
+#[derive(Debug, Clone)]
+pub struct Noeud<'a, 'tree>
+where
+    'tree: 'a,
+{
     pub node: Node<'tree>,
     pub ctx: &'a [u8],
 }
 
-impl<'a, 'tree> NodeLike<'a, 'tree> {
+impl<'a, 'tree> Display for Noeud<'a, 'tree> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // markdown-flavoured
+        f.write_str(&format!(
+            "Lines: {}-{}\n```python\n{}\n```",
+            self.node.start_position().row,
+            self.node.end_position().row,
+            self.ctx_as_str()
+        ))
+    }
+}
+
+impl<'a, 'tree> Noeud<'a, 'tree> {
     pub fn new(node: Node<'tree>, code: &'a [u8]) -> Self {
         Self { node, ctx: code }
     }
 
     pub fn ctx_as_str(&self) -> &str {
+        // Safety: string bounds parsed by TS so byte slice should always be valid utf8
         unsafe { str::from_utf8_unchecked(self.ctx) }
     }
-}
 
-impl<'a, 'tree> Display for NodeLike<'a, 'tree> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // markdown-flavoured
-        f.write_str(&format!("```python\n{}\n```", self.ctx_as_str()))
+    pub fn parse(&self, s_expr: &'static str) -> NoeudIter<'a, 'tree> {
+        let query = build_py_query(s_expr);
+        let (node, ctx) = (self.node, self.ctx);
+
+        NoeudIterBuilder {
+            query,
+            ctx,
+            builder: QueryCursor::new(),
+            cursor_builder: |builder, q| builder.matches(q, node, ctx),
+        }
+        .build()
     }
 }
 
-pub fn parse<'a, 'tree>(
-    root: NodeLike<'a, 'tree>,
-    s_expr: &'static str,
-) -> Vec<NodeLike<'a, 'tree>> {
-    let lang = tree_sitter_python::LANGUAGE.into();
-    let query = Query::new(&lang, s_expr).unwrap();
+#[self_referencing]
+pub struct NoeudIter<'a, 'tree>
+where
+    'tree: 'a,
+{
+    ctx: &'a [u8],
+    query: Query,
+    builder: QueryCursor,
 
-    let mut cursor = QueryCursor::new();
-    let mut res = cursor.matches(&query, root.node, root.ctx);
-
-    // parse matches into new sub-nodes for future exploration
-    // each sub-node will store a slice pointing to its raw code range
-    let mut nodes = vec![];
-
-    while let Some(item) = res.next() {
-        let node = item.captures[0];
-        let slice = &root.ctx[node.start_byte()..node.end_byte()];
-        nodes.push(NodeLike::new(node, slice));
-    }
-
-    nodes
+    // FIXME: later unpack this...
+    #[borrows(mut builder, query)]
+    #[not_covariant]
+    cursor: QueryMatches<'this, 'tree, &'a [u8], &'a [u8]>,
 }
 
-// parse_decorator!(workflow.define,activity,signal,update,query)
+// TODO: turn on proc macros to see types later
+impl<'a, 'tree> Iterator for NoeudIter<'a, 'tree> {
+    type Item = Noeud<'a, 'tree>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ctx = *self.borrow_ctx();
+
+        self.with_cursor_mut(|cur| {
+            if let Some(item) = cur.next() {
+                let node = item.captures[0].node;
+                let slice = &ctx[node.start_byte()..node.end_byte()];
+                Some(Noeud::new(node, slice))
+            } else {
+                None
+            }
+        })
+    }
+}

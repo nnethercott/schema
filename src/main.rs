@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use schema::parse::{self, NodeLike};
+use schema::parse::Noeud;
 use tree_sitter::Parser;
 
 fn main() {
@@ -30,28 +30,26 @@ def nate():
     "#;
 
     let tree = parser.parse(source_code, None).unwrap();
-    let root = NodeLike::new(tree.root_node(), source_code.as_bytes());
+    let root = Noeud::new(tree.root_node(), source_code.as_bytes());
     // let text_provider = root_node.to_sexp();
 
-//     let query = r#"
-// (function_definition
-//   (identifier) @top
-//   (#any-of? @top
-//    "foo"
-//    "bar"
-//    "decorator"))@body
-//     "#;
-
     let query = r#"
-(function_definition (_))@nate
+     (function_definition
+       (identifier) @top
+       (#any-of? @top
+        "foo"
+        "bar"))@body
     "#;
 
+//     let query = r#"
+// (function_definition (_))@nate
+//     "#;
+
     let now = Instant::now();
-    let parsed = parse::parse(root, query);
+    let parsed: Vec<_> = root.parse(query).collect();
     println!("{:?}", now.elapsed());
 
-    for node in parsed{
+    for node in parsed {
         println!("{}", node);
     }
-
 }

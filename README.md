@@ -6,7 +6,7 @@ Python schema parser to mermaid diagram using [tree-sitter](https://tree-sitter.
 
 For example consider the [durable lambda functions sdk](https://docs.aws.amazon.com/lambda/latest/dg/durable-basic-concepts.html):
 
-```python
+```python 
 @durable_step
 def my_step(step_context, data):
     pass
@@ -30,7 +30,7 @@ flowchart TD
 Ideally this diagram would be rendered _fast_ and _automatically_ without modification of the code.
 
 ## todo
-- [ ] node parsing and hierarchy resolving with tree-sitter
+- [ ] node parsing and hierarchy resolving with tree-sitter 
 - [ ] diagram rendering with [`mmdr`](https://github.com/1jehuang/mermaid-rs-renderer) in ascii and svg
 - [ ] clap cli
 - [ ] optimizations (concurrency(?) mmemap, etc)
