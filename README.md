@@ -27,7 +27,10 @@ flowchart TD
     end
 ```
 
-Ideally this diagram would be rendered _fast_ and _automatically_ without modification of the code.
+Ideally this diagram would be rendered _fast_ and _automatically_ without needing additional dependencies in the code.
+
+# tree-sitter
+![alt-text](./assets/tree-sitter.gif)
 
 ## todo
 - [ ] node parsing and hierarchy resolving with tree-sitter 
