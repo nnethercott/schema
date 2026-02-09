@@ -1,11 +1,13 @@
 use ignore::DirEntry;
 use schema::crawl::{CrawlOpts, Crawler};
 use schema::parse::Noeud;
-use schema::{parse::build_query, dec_s_expr};
+use schema::{dec_s_expr, parse::build_query};
+use tree_sitter_graph::functions::Functions;
 use std::fs::File;
 use std::io::Read;
 use std::time::Instant;
 use tree_sitter::Parser;
+use tree_sitter_graph::{ExecutionConfig, NoCancellation, Variables, ast, functions};
 
 fn main() {
     let now = Instant::now();
@@ -33,7 +35,41 @@ fn tree_sitter_parse(e: &DirEntry) {
 
     let query = build_query(&dec_s_expr!("workflows.workflow.define","activity"));
     let mut hits = root.parse(&query);
+
     while let Some(entry) = hits.next() {
-        dbg!(entry);
+        for e in entry{
+            // dbg!(&e);
+            let (_, sample) = &e;
+            tree_sitter_graph(sample, &mut parser);
+        }
     }
+}
+
+fn tree_sitter_graph(node: &Noeud, parser: &mut Parser) {
+    // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/parser.rs
+    let source = r#"
+        (function_definition
+          name: (identifier) @_cap1) @cap2
+        {
+          node loc1
+          node @cap2.prop1
+          edge @cap2.prop1 -> loc1
+          attr (@cap2.prop1 -> loc1) precedence
+          attr (@cap2.prop1) push = "str2", pop
+          var @cap2.var1 = loc1
+          set @cap2.var1 = loc1
+        }
+    "#;
+
+    let file =
+        ast::File::from_str(tree_sitter_python::LANGUAGE.into(), source).expect("Cannot parse file");
+
+    let tree = parser.parse(&node.ctx, None).unwrap();
+    // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/execution.rs
+    let functions = Functions::stdlib();
+    let globals = Variables::new();
+    let mut config = ExecutionConfig::new(&functions, &globals);
+    let graph = file.execute(&tree, node.ctx_as_str(), &mut config, &NoCancellation).unwrap();
+
+    println!("{}", graph.pretty_print());
 }
