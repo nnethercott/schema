@@ -4,9 +4,10 @@
 //! [2]: https://en.wikipedia.org/wiki/S-expression
 
 use std::fmt::Debug;
+use streaming_iterator::StreamingIterator;
 
 use ouroboros::self_referencing;
-use tree_sitter::{Node, Query, QueryCursor, QueryMatches, StreamingIterator};
+use tree_sitter::{Node, Query, QueryCursor, QueryMatches};
 
 pub fn build_query(s_expr: &str) -> Query {
     let lang = tree_sitter_python::LANGUAGE.into();

@@ -7,11 +7,13 @@ edition = "2024"
 path = "./src/lib.rs"
 
 [dependencies]
-ignore = "0.4.25"
+ignore = { version = "0.4.25", features=["simd-accel"] }
 memmap2 = "0.9.9"
 ouroboros = "0.18.5"
-tree-sitter = "0.26.5"
-tree-sitter-python = "0.25.0"
+streaming-iterator = "0.1.9"
+tree-sitter = "0.24.7"
+tree-sitter-graph = "0.12.0"
+tree-sitter-python = "0.23"
 
 # [profile.release]
 # lto = "thin"
