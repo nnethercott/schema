@@ -40,7 +40,6 @@ impl Crawler {
         WalkBuilder::new(&self.opts.path)
             .follow_links(false)
             .standard_filters(true)
-            .threads(10)
             .build_parallel()
             .run(|| {
                 let opts = Arc::clone(&opts);

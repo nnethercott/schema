@@ -19,6 +19,6 @@ def nate():
     print("hi")
 
 
-@foo
+@foo.bar.baz()
 def jack():
     pass

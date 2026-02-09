@@ -1,6 +1,9 @@
-// TODO: use fuzzy matching with a `#match?` statement ?
+// TODO: play around with query structure, some syntaxes _seem_ faster
+// maybe deeper patterns take longer to match, should move fast cases first,
+// or check code statistically to see distribution
+
 #[macro_export]
-macro_rules! s_expr {
+macro_rules! dec_s_expr {
     ($($d:literal),*) => {
         {
             let mut v = vec![];
@@ -9,17 +12,25 @@ macro_rules! s_expr {
             )*
             let allowlist = v.join(" ");
             let query = format!(r#"
-                (decorated_definition
-                (decorator
-                    (call
-                    function: (identifier) @decorator.name
-                    arguments: (argument_list) @decorator.args)*
-                    (identifier)*  @decorator.ident )
-                    (_)@body
-                    (#any-of? @decorator.name {}))
-                        "#, 
+ (decorated_definition
+    (decorator[
+        ;; @foo(*args)
+        ;; @foo.bar.baz(*args)
+        (call
+            [
+                function: (identifier) @decorator.name
+                function: (attribute (_) .) @decorator.name
+            ]
+        )
+        ;; @foo
+        ;; @foo.bar.baz
+        [
+            (identifier) @decorator.name
+            (attribute (_) .) @decorator.name
+        ]
+    ])(#any-of? @decorator.name {}))@body
+                        "#,
                 allowlist);
-
             query
         }
     };
