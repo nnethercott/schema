@@ -20,7 +20,7 @@ where
     'tree: 'a,
 {
     pub node: Node<'tree>,
-    pub ctx: &'a [u8],
+    pub src: &'a [u8],
 }
 
 impl<'a, 'tree> Debug for Noeud<'a, 'tree> {
@@ -37,20 +37,24 @@ impl<'a, 'tree> Debug for Noeud<'a, 'tree> {
 
 impl<'a, 'tree> Noeud<'a, 'tree> {
     pub fn new(node: Node<'tree>, code: &'a [u8]) -> Self {
-        Self { node, ctx: code }
+        Self { node, src: code }
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.src[self.node.start_byte()..self.node.end_byte()]
     }
 
     pub fn ctx_as_str(&self) -> &str {
         // Safety: string bounds parsed by TS so byte slice should always be valid utf8
-        unsafe { str::from_utf8_unchecked(self.ctx) }
+        unsafe { str::from_utf8_unchecked(self.bytes()) }
     }
 
     pub fn parse(&self, query: &'a Query) -> NoeudIter<'a, 'tree> {
-        let Noeud { node, ctx } = self.clone();
+        let Noeud { node, src: ctx } = self.clone();
 
         NoeudIterBuilder {
             query,
-            ctx,
+            src: ctx,
             builder: QueryCursor::new(),
             cursor_builder: |builder, q| builder.matches(q, node, ctx),
         }
@@ -63,7 +67,7 @@ pub struct NoeudIter<'a, 'tree>
 where
     'tree: 'a,
 {
-    ctx: &'a [u8],
+    src: &'a [u8],
     query: &'a Query,
     builder: QueryCursor,
 
@@ -77,7 +81,7 @@ impl<'a, 'tree> Iterator for NoeudIter<'a, 'tree> {
     type Item = Vec<(&'a str, Noeud<'a, 'tree>)>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ctx = *self.borrow_ctx();
+        let src = *self.borrow_src();
         let group_names = self.borrow_query().capture_names();
 
         self.with_cursor_mut(|cur| {
@@ -87,9 +91,8 @@ impl<'a, 'tree> Iterator for NoeudIter<'a, 'tree> {
                     .iter()
                     .map(|item| {
                         let node = item.node;
-                        let slice = &ctx[node.start_byte()..node.end_byte()];
                         let group = group_names[item.index as usize];
-                        (group, Noeud::new(node, slice))
+                        (group, Noeud::new(node, src))
                     })
                     .collect::<Vec<_>>();
                 Some(next)

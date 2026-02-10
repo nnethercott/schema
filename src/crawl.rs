@@ -4,29 +4,55 @@
 use ignore::{DirEntry, WalkBuilder, WalkState};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
 
 pub struct CrawlOpts {
-    pub path: PathBuf,
+    pub dir: PathBuf,
+    pub threads: usize,
     pub allowed_exts: Vec<String>,
 }
 
 impl Default for CrawlOpts {
     fn default() -> Self {
         Self {
-            path: PathBuf::from("./"),
-            allowed_exts: vec!["py".into()],
+            dir: "./".into(),
+            threads: 0,
+            allowed_exts: vec![],
         }
+    }
+}
+
+pub trait Visitor: Send + Sync {
+    type Item;
+
+    fn visit(self: &Arc<Self>, item: Self::Item);
+}
+
+#[allow(dead_code)]
+pub struct DoNothingVisitor;
+impl Visitor for DoNothingVisitor {
+    type Item = ();
+
+    fn visit(self: &Arc<Self>, _: Self::Item) {}
+}
+
+impl CrawlOpts {
+    pub fn path<P: Into<PathBuf>>(mut self, dir: P) -> Self {
+        self.dir = dir.into();
+        self
+    }
+    pub fn threads(mut self, threads: usize) -> Self {
+        self.threads = threads;
+        self
+    }
+    pub fn add_ext(mut self, ext: &str) -> Self {
+        self.allowed_exts.push(ext.to_string());
+        self
     }
 }
 
 pub struct Crawler {
     opts: Arc<CrawlOpts>,
 }
-
-// FIXME: update signature of the crawl function to take in an impl `State` with state.update(res),
-// res = f(&DirEntry) -> T?
-// this would let us
 
 impl Crawler {
     pub fn new(opts: CrawlOpts) -> Self {
@@ -35,24 +61,24 @@ impl Crawler {
         }
     }
 
-    pub fn crawl<F>(&self, f: F)
+    pub fn crawl<F, V, I>(&self, f: F, v: V)
     where
-        F: Fn(&DirEntry) + Send + Sync,
+        F: Fn(&DirEntry) -> I + Send + Sync,
+        V: Visitor<Item = I>,
     {
         let opts = Arc::clone(&self.opts);
         let f = Arc::new(f);
+        let visitor = Arc::new(v);
 
-        let threads = thread::available_parallelism().map_or(0, |nz| nz.get());
-        dbg!(threads);
-
-        WalkBuilder::new(&self.opts.path)
+        WalkBuilder::new(&self.opts.dir)
             .follow_links(false)
             .standard_filters(true)
-            .threads(threads)
+            .threads(opts.threads)
             .build_parallel()
             .run(|| {
                 let opts = Arc::clone(&opts);
                 let f = Arc::clone(&f);
+                let visitor = Arc::clone(&visitor);
                 Box::new(move |result| {
                     let Ok(entry) = result else {
                         return WalkState::Continue;
@@ -65,7 +91,7 @@ impl Crawler {
                         .is_some_and(|ext| opts.allowed_exts.iter().any(|a| a == ext));
 
                     if is_allowed {
-                        f(&entry);
+                        visitor.visit(f(&entry));
                     }
                     return WalkState::Continue;
                 })

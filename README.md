@@ -1,10 +1,11 @@
+![alt-text](./assets/lg.png)
 # draveur
-Python schema parser to mermaid diagram using [tree-sitter](https://tree-sitter.github.io/tree-sitter/index.html).
+Python cst to graph IR parser using [tree-sitter](https://tree-sitter.github.io/tree-sitter/index.html).
 
-We're [dancing on trees](https://www.youtube.com/watch?v=upsZZ2s3xv8) so the name is only appropriate.
+For info on the name check out [this piece of canadian heritage](https://www.youtube.com/watch?v=upsZZ2s3xv8)
 
 ## motivation
-`schema` aims to render workflow-like code composed via decorated functions as a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) to visualize application logic.
+`draveur` aims to render workflow-like code composed via decorated functions as a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) to visualize application logic.
 
 For example consider the [durable lambda functions sdk](https://docs.aws.amazon.com/lambda/latest/dg/durable-basic-concepts.html):
 

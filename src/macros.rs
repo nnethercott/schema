@@ -1,7 +1,3 @@
-// TODO: play around with query structure, some syntaxes _seem_ faster
-// maybe deeper patterns take longer to match, should move fast cases first,
-// or check code statistically to see distribution
-
 #[macro_export]
 macro_rules! dec_s_expr {
     ($($d:literal),*) => {
