@@ -24,6 +24,10 @@ pub struct Crawler {
     opts: Arc<CrawlOpts>,
 }
 
+// FIXME: update signature of the crawl function to take in an impl `State` with state.update(res),
+// res = f(&DirEntry) -> T?
+// this would let us
+
 impl Crawler {
     pub fn new(opts: CrawlOpts) -> Self {
         Self {
