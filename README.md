@@ -1,5 +1,3 @@
-<p align="center"><img width="280px" src="assets/lg.png"></a>
-
 # draveur
 Python cst to graph IR parser using [tree-sitter](https://tree-sitter.github.io/tree-sitter/index.html).
 
