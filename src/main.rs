@@ -13,7 +13,7 @@ fn main() {
     let now = Instant::now();
 
     let mut opts = CrawlOpts::default();
-    opts.path = "/Users/naten/mistral/dashboard/workflow_sdk/".into();
+    // opts.path = "/Users/naten/mistral/dashboard/workflow_sdk/".into();
     let crawler = Crawler::new(opts);
     crawler.crawl(tree_sitter_parse);
 
@@ -24,6 +24,8 @@ fn main() {
 /// builds AST and extracts decorator definitions
 fn tree_sitter_parse(e: &DirEntry) {
     let mut f = File::open(e.path()).unwrap();
+
+    // FIXME: build registry of parsers indexed by thread id?
     let mut parser = Parser::new();
     let lang = tree_sitter_python::LANGUAGE.into();
     parser.set_language(&lang).unwrap();
@@ -33,7 +35,7 @@ fn tree_sitter_parse(e: &DirEntry) {
     let tree = parser.parse(&buf, None).unwrap();
     let root = Noeud::new(tree.root_node(), &buf);
 
-    let query = build_query(&dec_s_expr!("workflows.workflow.define","activity"));
+    let query = build_query(&dec_s_expr!("workflows.workflow.define","activity", "foo"));
     let mut hits = root.parse(&query);
 
     while let Some(entry) = hits.next() {

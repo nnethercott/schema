@@ -4,6 +4,7 @@
 use ignore::{DirEntry, WalkBuilder, WalkState};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread;
 
 pub struct CrawlOpts {
     pub path: PathBuf,
@@ -37,9 +38,13 @@ impl Crawler {
         let opts = Arc::clone(&self.opts);
         let f = Arc::new(f);
 
+        let threads = thread::available_parallelism().map_or(0, |nz| nz.get());
+        dbg!(threads);
+
         WalkBuilder::new(&self.opts.path)
             .follow_links(false)
             .standard_filters(true)
+            .threads(threads)
             .build_parallel()
             .run(|| {
                 let opts = Arc::clone(&opts);

@@ -1,5 +1,7 @@
-# schema
+# draveur
 Python schema parser to mermaid diagram using [tree-sitter](https://tree-sitter.github.io/tree-sitter/index.html).
+
+We're [dancing on trees](https://www.youtube.com/watch?v=upsZZ2s3xv8) so the name is only appropriate.
 
 ## motivation
 `schema` aims to render workflow-like code composed via decorated functions as a [DAG](https://en.wikipedia.org/wiki/Directed_acyclic_graph) to visualize application logic.
@@ -33,7 +35,7 @@ Ideally this diagram would be rendered _fast_ and _automatically_ without needin
 ![alt-text](./assets/tree-sitter.gif)
 
 ## todo
-- [ ] node parsing and hierarchy resolving with tree-sitter 
+- [x] node parsing and hierarchy resolving with tree-sitter 
 - [ ] diagram rendering with [`mmdr`](https://github.com/1jehuang/mermaid-rs-renderer) in ascii and svg
 - [ ] clap cli
 - [ ] optimizations (concurrency(?) mmemap, etc)
