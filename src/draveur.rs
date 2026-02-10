@@ -1,22 +1,27 @@
 use crate::{
-    dec_s_expr,
-    parse::{Noeud, build_query},
+    dec_s_expr, stanzas, parse::{Noeud, build_query}
 };
 use ignore::DirEntry;
 use madvise::AdviseMemory;
 use memmap2::{Mmap, MmapOptions};
 use once_cell::sync::Lazy;
 use std::{
-    fs::File, io::Read, path::Path, sync::{Arc, Mutex}, thread
+    fs::File,
+    io::Read,
+    path::Path,
+    sync::{Arc, Mutex},
+    thread,
 };
 use tree_sitter::Parser;
-use tree_sitter_graph::{ExecutionConfig, NoCancellation, Variables, ast, functions::Functions};
+use tree_sitter_graph::{
+    ExecutionConfig, NoCancellation, Variables, ast, functions::Functions
+};
 
-static MMAP_MIN_SIZE: usize = 4096;
+static MMAP_MIN_SIZE: usize = 8192;
 
 // Per-thread parser pool
 static PARSER_POOL: Lazy<Vec<Arc<Mutex<Parser>>>> = Lazy::new(|| {
-    let threads = thread::available_parallelism().map_or(1, |nz| nz.get());
+    let threads = thread::available_parallelism().map_or(1, |t| t.get());
     let mut parsers = Vec::with_capacity(threads);
 
     for _ in 0..threads {
@@ -58,7 +63,9 @@ impl FileBuffer {
     }
 }
 
-fn read_bytes(path: &Path, file_size: usize) -> FileBuffer {
+// FIXME: add proper error handling
+// FIXME: maybe replace all this with bufreader?
+fn buffered(path: &Path, file_size: usize) -> FileBuffer {
     if file_size > MMAP_MIN_SIZE {
         let file = File::open(path).unwrap();
         let mmap = unsafe {
@@ -73,8 +80,9 @@ fn read_bytes(path: &Path, file_size: usize) -> FileBuffer {
         return FileBuffer::Mapped(mmap);
     }
 
+    // small enough to read into ram
     let mut file = File::open(path).unwrap();
-    let mut buf = Vec::with_capacity(file_size);
+    let mut buf = vec![0; file_size];
     file.read(&mut buf).unwrap();
     FileBuffer::Raw(buf)
 }
@@ -83,13 +91,12 @@ fn read_bytes(path: &Path, file_size: usize) -> FileBuffer {
 /// builds AST and extracts decorator definitions
 pub fn tree_sitter_parse(e: &DirEntry) {
     let file_size = e.metadata().unwrap().len() as usize;
-    let buf = read_bytes(e.path(), file_size);
+    let buf = buffered(e.path(), file_size);
     let bytes = buf.bytes();
 
     let thread_id = thread::current().id().as_u64().get();
     let id = thread_id % PARSER_POOL.len() as u64;
     let parser_mutex = PARSER_POOL.get(id as usize).unwrap();
-
     let mut parser = parser_mutex.lock().unwrap();
 
     let tree = parser.parse(bytes, None).unwrap();
@@ -99,41 +106,28 @@ pub fn tree_sitter_parse(e: &DirEntry) {
     let mut hits = root.parse(&query);
 
     while let Some(entry) = hits.next() {
-        for e in entry {
-            // dbg!(&e);
-            let (_, sample) = &e;
-            tree_sitter_graph(sample, &mut parser);
+        for (_, e) in &entry {
+            // dbg!(e.node.to_sexp());
+            tree_sitter_graph(e, &mut parser);
         }
     }
 }
 
 fn tree_sitter_graph(node: &Noeud, parser: &mut Parser) {
     // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/parser.rs
-    let source = r#"
-        (function_definition
-          name: (identifier) @_cap1) @cap2
-        {
-          node loc1
-          node @cap2.prop1
-          edge @cap2.prop1 -> loc1
-          attr (@cap2.prop1 -> loc1) precedence
-          attr (@cap2.prop1) push = "str2", pop
-          var @cap2.var1 = loc1
-          set @cap2.var1 = loc1
-        }
-    "#;
+    let source = stanzas!();
 
-    let file = ast::File::from_str(tree_sitter_python::LANGUAGE.into(), source)
-        .expect("Cannot parse file");
+    let tree = parser.parse(&node.bytes(), None).unwrap();
 
-    let tree = parser.parse(&node.src, None).unwrap();
     // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/execution.rs
+    let file = ast::File::from_str(tree_sitter_python::LANGUAGE.into(), &source)
+        .expect("Cannot parse file");
     let functions = Functions::stdlib();
     let globals = Variables::new();
-    let mut config = ExecutionConfig::new(&functions, &globals);
+    let mut config = ExecutionConfig::new(&functions, &globals).lazy(true);
+
     let graph = file
         .execute(&tree, node.ctx_as_str(), &mut config, &NoCancellation)
         .unwrap();
-
-    // println!("{}", graph.pretty_print());
+    println!("{}", graph.pretty_print());
 }

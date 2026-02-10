@@ -18,7 +18,10 @@ def bar():
 def nate():
     print("hi")
 
-
-@foo.bar.baz()
-def jack():
-    pass
+@workflows.workflow.define
+class Nate(Bar, Baz):
+    def __init__(self):
+        pass
+    @entrypoint
+    def entrypoint(self, args):
+        pass
