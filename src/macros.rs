@@ -48,7 +48,7 @@ macro_rules! stanzas {
         (class_definition
             name: (identifier) @class_name) @class
         {{
-            node @class.node 
+            node @class.node
             attr (@class.node) name = (source-text @class_name)
             attr (@class.node) kind = "class"
         }}
@@ -63,16 +63,16 @@ macro_rules! stanzas {
         }}
 
         ;; class methods
-        (class_definition
-            name: (identifier) @_class_name
-            body: (block 
-                (function_definition
-                name: (identifier)) @fn
-            )
-        ) @_class
-        {{
-            ;; figure stuff out
-        }}
+        ;; (class_definition
+        ;;     name: (identifier) @_class_name
+        ;;     body: (block
+        ;;         (function_definition
+        ;;         name: (identifier)) @fn
+        ;;     )
+        ;; ) @_class
+        ;; {{
+        ;;     ;; figure stuff out
+        ;; }}
 
     "#
         )
