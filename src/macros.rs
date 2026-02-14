@@ -46,7 +46,25 @@ mod decorators {
     }
 }
 
-// FIXME: capture function parameter types
+// TODO: capture function parameter types
+// TODO: common attributes like line number and such
+
+mod attributes{
+    #[macro_export]
+    macro_rules! common_attributes {
+        () => {
+            r#"
+attribute common_attrs = node => 
+    src = (source-text node), 
+    type = (node-type node),
+    start_col = (plus global_column (start-column node)), 
+    start_row = (plus global_row (start-row node)),
+    end_col = (plus global_column (end-column node)), 
+    end_row = (plus global_row (end-row node) 1) ;; note the offset
+            "#
+        };
+    }
+}
 
 mod stanzas {
     #[macro_export]
@@ -60,7 +78,8 @@ mod stanzas {
 {
     node @class.node
     attr (@class.node) name = (source-text @class_name)
-    attr (@class.node) kind = "class"
+    attr (@class.node) common_attrs = @class
+    attr (@class.node) filename = global_filename
 }
 "#
         };
@@ -81,7 +100,7 @@ mod stanzas {
 {
     node @fn.node
     attr (@fn.node) name = (source-text @fn_name)
-    attr (@fn.node) src = (source-text @fn)
+    attr (@fn.node) common_attrs = @fn
 
     ;; edge annotations
     edge @class.node -> @fn.node
@@ -110,30 +129,46 @@ mod stanzas {
 ) @class
 {{
     node @fn.node
-    attr (@fn.node) wrapper = (source-text @decorator_name)
+    attr (@fn.node) decorator = (source-text @decorator_name)
     attr (@fn.node) name = (source-text @fn_name)
-    attr (@fn.node) src = (source-text @fn)
+    attr (@fn.node) common_attrs = @fn
 
     ;; edge annotations
     edge @class.node -> @fn.node
-    attr (@class.node -> @fn.node) rel = "wrapped_method"
+    attr (@class.node -> @fn.node) rel = "method"
 }}
 "#,
                 $crate::decorator!()
             )
         };
     }
+
+    macro_rules! stanza_calls {
+        () => {
+            // TODO: add nodes to nested calls as edges, order by src_code line number 
+            // might involve recursion
+           todo!() 
+        };
+    }
 }
+
 
 #[macro_export]
 macro_rules! stanzas {
     // stanzas!() - all stanzas
     () => {
         format!(
-            "{}{}{}",
+            r#"
+                global global_filename 
+                global global_row 
+                global global_column
+                {}{}{}{}
+            "#,
+            $crate::common_attributes!(),
             $crate::stanza_classes!(),
             $crate::stanza_methods!(),
             $crate::stanza_wrapped_methods!()
+            // stanza_nested_calls
         )
     };
 }

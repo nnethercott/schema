@@ -27,7 +27,7 @@ pub trait Visitor: Send + Sync {
     fn visit(self: &Arc<Self>, item: Self::Item);
 }
 
-#[allow(dead_code)]
+#[derive(Clone)]
 pub struct DoNothingVisitor;
 impl Visitor for DoNothingVisitor {
     type Item = ();

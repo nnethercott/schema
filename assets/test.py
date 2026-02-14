@@ -21,21 +21,24 @@ def nate():
 
 @workflows.workflow.define
 class Nate(Bar, Baz):
-    def __init__(self):
-        pass
-
     @cache
     @foo
     @staticmethod
     def doubly_decorated(self):
         pass
 
-    def another_method(self):
+    def a_method(self):
         def inner():
             pass
 
+    @workflows.activity()
+    def activity_in_class():
+        pass
+
     @entrypoint
     def nate(self, args):
-        pass
+        @workflows.activity()
+        def activity_in_wrapper():
+            pass
 
 class Bar: ...
