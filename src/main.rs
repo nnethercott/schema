@@ -1,6 +1,6 @@
 use draveur::{
     crawl::{CrawlOpts, Crawler, DoNothingVisitor},
-    dec_s_expr,
+    decorated_objects,
     draveur::tree_sitter_parse,
     parse::build_query,
     stanzas,
@@ -13,15 +13,27 @@ fn main() {
     let now = Instant::now();
 
     let opts = CrawlOpts::default()
-        .path("/Users/naten/mistral/dashboard/")
+        // .path("/Users/naten/mistral/dashboard/workflow_sdk/")
         .threads(10)
         .add_ext("py");
 
     let crawler = Crawler::new(opts);
 
+    // these just go inside of the draveur...
+    let query = build_query(&decorated_objects!(
+        "workflows.workflow.define",
+        "workflows.update",
+        "workflows.query",
+        "workflows.signal",
+        "activity",
+        "foo"
+    ));
+    // let query = build_query("(module)@all");
+    let stanzas =
+        ast::File::from_str(tree_sitter_python::LANGUAGE.into(), &stanzas!()).expect(&stanzas!());
+    println!("{}", &stanzas!());
+
     let tls = ThreadLocal::with_capacity(10);
-    let query = build_query(&dec_s_expr!("workflows.workflow.define", "activity", "foo"));
-    let stanzas = ast::File::from_str(tree_sitter_python::LANGUAGE.into(), &stanzas!()).unwrap();
 
     crawler.crawl(
         |e| tree_sitter_parse(e, &query, &stanzas, &tls),

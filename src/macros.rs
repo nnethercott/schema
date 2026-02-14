@@ -1,80 +1,139 @@
-#[macro_export]
-macro_rules! dec_s_expr {
-    ($($d:literal),*) => {
-        {
-            let mut v = vec![];
-            $(
-                v.push(format!("{}", $d));
-            )*
-            let allowlist = v.join(" ");
-            let query = format!(r#"
- (decorated_definition
-    (decorator[
-        ;; @foo(*args)
-        ;; @foo.bar.baz(*args)
-        (call
-            [
-                function: (identifier) @decorator.name
-                function: (attribute (_) .) @decorator.name
-            ]
-        )
-        ;; @foo
-        ;; @foo.bar.baz
-        [
-            (identifier) @decorator.name
-            (attribute (_) .) @decorator.name
-        ]
-    ])(#any-of? @decorator.name {}))@body
-                        "#,
-                allowlist);
-            query
-        }
-    };
+mod decorators {
+    /// Extracts name from decorated block
+    #[macro_export]
+    macro_rules! decorator {
+        () => {
+            r#"(decorator
+                [
+                    ;; @a()
+                    ;; @a.b()
+                    (call
+                        [
+                            function: (identifier) @decorator_name
+                            function: (attribute (_) .) @decorator_name
+                        ]
+                    )
+                    ;; @a
+                    ;; @a.b
+                    [
+                        (identifier) @decorator_name
+                        (attribute (_) .) @decorator_name
+                    ]
+                ]
+            ) 
+            ;; only capture last decorator if multiple
+            @_ ."#
+        };
+    }
+
+    /// Captures decorated objects
+    #[macro_export]
+    macro_rules! decorated_objects {
+        // dec!()
+        () => {
+            format!("(decorated_definition ({})) @body", $crate::_decorator!())
+        };
+
+        // dec!("foo", "bar")
+        ($($d:literal),+ $(,)?) => {{
+            let allowlist = [$($d),+].join(" ");
+            format!(
+                "(decorated_definition ({}) (#any-of? @decorator_name {})) @body",
+                $crate::decorator!(),
+                allowlist
+            )
+        }};
+    }
 }
 
-// * assumes ctx is parsed from s-expr earlier
-// - one stanza for class nodes
-// - one stanza for fn nodes
-//  - make general stanza for all captured functions to add labels
-//  - make another one like here specialize to class methods?: https://docs.rs/tree-sitter-graph/latest/tree_sitter_graph/reference/index.html#graph-nodes
-// FIXME: bit of work to be done on parsing function parameter types
+// FIXME: capture function parameter types
+
+mod stanzas {
+    #[macro_export]
+    macro_rules! stanza_classes {
+        () => {
+        r#"
+;; classes
+(class_definition
+    name: (identifier) @class_name
+) @class
+{
+    node @class.node
+    attr (@class.node) name = (source-text @class_name)
+    attr (@class.node) kind = "class"
+}
+"#
+        };
+    }
+
+    #[macro_export]
+    macro_rules! stanza_methods {
+        () => {
+            r#"
+;; methods
+(class_definition
+    body: (block
+        (function_definition
+            name: (identifier) @fn_name
+        ) @fn
+    )
+) @class
+{
+    node @fn.node
+    attr (@fn.node) name = (source-text @fn_name)
+    attr (@fn.node) src = (source-text @fn)
+
+    ;; edge annotations
+    edge @class.node -> @fn.node
+    attr (@class.node -> @fn.node) rel = "method"
+}
+"#
+        };
+    }
+
+    #[macro_export]
+    macro_rules! stanza_wrapped_methods {
+        () => {
+            format!(
+                r#"
+;; wrapped methods
+(class_definition
+    body: (block
+        (decorated_definition
+            {}
+            definition: (
+                function_definition
+                    name: (identifier) @fn_name
+            ) @fn
+        ) 
+    )
+) @class
+{{
+    node @fn.node
+    attr (@fn.node) wrapper = (source-text @decorator_name)
+    attr (@fn.node) name = (source-text @fn_name)
+    attr (@fn.node) src = (source-text @fn)
+
+    ;; edge annotations
+    edge @class.node -> @fn.node
+    attr (@class.node -> @fn.node) rel = "wrapped_method"
+}}
+"#,
+                $crate::decorator!()
+            )
+        };
+    }
+}
 
 #[macro_export]
 macro_rules! stanzas {
-    () => {{
+    // stanzas!() - all stanzas
+    () => {
         format!(
-            r#"
-        ;; classes
-        (class_definition
-            name: (identifier) @class_name) @class
-        {{
-            node @class.node
-            attr (@class.node) name = (source-text @class_name)
-            attr (@class.node) kind = "class"
-        }}
-
-        ;; function definitions
-        (function_definition
-          name: (identifier) @fn_name) @fn
-        {{
-            node @fn.node
-            attr (@fn.node) name = (source-text @fn_name)
-            attr (@fn.node) kind = "fn"
-        }}
-
-        ;; class methods
-        ;; (class_definition
-        ;;     name: (identifier) @_class_name
-        ;;     body: (block
-        ;;         (function_definition
-        ;;         name: (identifier)) @fn
-        ;;     )
-        ;; ) @_class
-        ;; {{
-        ;;     ;; figure stuff out
-        ;; }}
-
-    "#
+            "{}{}{}",
+            $crate::stanza_classes!(),
+            $crate::stanza_methods!(),
+            $crate::stanza_wrapped_methods!()
         )
-    }};
+    };
 }

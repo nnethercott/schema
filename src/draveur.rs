@@ -1,8 +1,6 @@
-use crate::{
-    dec_s_expr,
-    parse::{Noeud, build_query},
-    stanzas,
-};
+use crate::
+    parse::Noeud
+;
 use ignore::DirEntry;
 use madvise::AdviseMemory;
 use memmap2::{Mmap, MmapOptions};
@@ -114,8 +112,10 @@ fn tree_sitter_graph(node: &Noeud, stanzas: &ast::File, tls: &ThreadLocal<Mutex<
     let globals = Variables::new();
     let mut config = ExecutionConfig::new(&functions, &globals).lazy(true);
 
-    let _graph = stanzas
+    let graph = stanzas
         .execute(&tree, node.ctx_as_str(), &mut config, &NoCancellation)
-        .unwrap();
-    // println!("{}", graph.pretty_print());
+        .expect(
+            node.ctx_as_str()
+        );
+    println!("{}", graph.pretty_print());
 }
