@@ -9,9 +9,9 @@ use streaming_iterator::StreamingIterator;
 use ouroboros::self_referencing;
 use tree_sitter::{Node, Query, QueryCursor, QueryMatches};
 
-pub fn build_query(s_expr: &str) -> Query {
+pub fn build_query(s_expr: String) -> Query {
     let lang = tree_sitter_python::LANGUAGE.into();
-    Query::new(&lang, s_expr).unwrap()
+    Query::new(&lang, &s_expr).unwrap()
 }
 
 #[derive(Clone)]

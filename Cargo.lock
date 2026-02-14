@@ -83,6 +83,7 @@ dependencies = [
  "madvise",
  "memmap2",
  "ouroboros",
+ "serde_json",
  "streaming-iterator",
  "thread_local",
  "tree-sitter",

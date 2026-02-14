@@ -20,19 +20,18 @@ impl Default for CrawlOpts {
         }
     }
 }
-
 pub trait Visitor: Send + Sync {
     type Item;
 
-    fn visit(self: &Arc<Self>, item: Self::Item);
+    fn visit(&self, item: Self::Item);
 }
 
-#[derive(Clone)]
+#[allow(dead_code)]
 pub struct DoNothingVisitor;
 impl Visitor for DoNothingVisitor {
     type Item = ();
 
-    fn visit(self: &Arc<Self>, _: Self::Item) {}
+    fn visit(&self, _: Self::Item) {}
 }
 
 impl CrawlOpts {

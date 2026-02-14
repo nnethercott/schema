@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::{
-    crawl::{CrawlOpts, Crawler, DoNothingVisitor, Visitor},
+    crawl::{CrawlOpts, Crawler, Visitor},
     decorated_objects,
     parse::{Noeud, build_query},
     stanzas,
@@ -9,7 +9,8 @@ use crate::{
 use ignore::DirEntry;
 use madvise::AdviseMemory;
 use memmap2::{Mmap, MmapOptions};
-use std::{collections::HashMap, fs::File, io::Read, path::Path, sync::Mutex};
+use std::sync::mpsc::{Sender, channel};
+use std::{fs::File, io::Read, path::Path, sync::Mutex};
 use thread_local::ThreadLocal;
 use tree_sitter::{Parser, Query};
 use tree_sitter_graph::{
@@ -18,49 +19,46 @@ use tree_sitter_graph::{
 
 static MMAP_MIN_SIZE: usize = 8192;
 
-struct State;
-impl Visitor for State {
-    type Item = ();
+#[derive(Debug)]
+struct State {
+    // pushes subgraph from thread to an mpsc queue
+    tx: Sender<serde_json::Value>,
+}
 
-    fn visit(self: &std::sync::Arc<Self>, _: Self::Item) {
-        todo!()
+impl Visitor for State {
+    type Item = Vec<Option<serde_json::Value>>;
+
+    fn visit(&self, value: Self::Item) {
+        for v in value.into_iter().filter_map(|g| g) {
+            self.tx.send(v).expect("failed to send");
+        }
     }
 }
 
 pub struct Draveur {
-    state: DoNothingVisitor,
+    query: Query,
+    stanzas: ast::File,
 }
+
 impl Draveur {
-    pub fn new() -> Self {
-        Self {
-            state: DoNothingVisitor {},
-        }
+    pub fn new(query: Query, stanzas: ast::File) -> Self {
+        Self { query, stanzas }
     }
 
     pub fn waltz(&self, path: &str) {
         let opts = CrawlOpts::default().path(path).threads(10).add_ext("py");
-
         let crawler = Crawler::new(opts);
 
-        // these just go inside of the draveur...
-        // let query = build_query("(module)@all");
-        let query = build_query(&decorated_objects!(
-            "workflows.workflow.define",
-            "workflows.update",
-            "workflows.query",
-            "workflows.signal",
-            "activity",
-            "foo"
-        ));
-        let stanzas = ast::File::from_str(tree_sitter_python::LANGUAGE.into(), &stanzas!())
-            .expect(&stanzas!());
+        let tls = ThreadLocal::with_capacity(10); // fixme: use available_cores() or builder opts
+        let (tx, rx) = channel();
+        let state = State { tx };
 
-        let tls = ThreadLocal::with_capacity(10);
+        crawler.crawl(|e| parse_file(e, &self.query, &self.stanzas, &tls), state);
 
-        crawler.crawl(
-            |e| tree_sitter_parse(e, &query, &stanzas, &tls),
-            self.state.clone(),
-        );
+        //consume the queue
+        while let Ok(g) = rx.recv() {
+            //dbg!(&g);
+        }
     }
 }
 
@@ -100,13 +98,13 @@ fn buffered(path: &Path, file_size: usize) -> FileBuffer {
     FileBuffer::Raw(buf)
 }
 
-// TODO: inject globals into node_graph (e.g file name, rel offset) so we can add them as attributes
-pub fn tree_sitter_parse(
+// TODO: create a new helper struct for queries/stanzas - might be draveur
+pub fn parse_file(
     e: &DirEntry,
     query: &Query,
     stanzas: &ast::File,
     tls: &ThreadLocal<Mutex<Parser>>,
-) {
+) -> Vec<Option<serde_json::Value>> {
     let file_size = e.metadata().unwrap().len() as usize;
     let buf = buffered(e.path(), file_size);
     let bytes = buf.bytes();
@@ -124,34 +122,27 @@ pub fn tree_sitter_parse(
     };
 
     let root = Noeud::new(tree.root_node(), &bytes);
-
     let mut hits = root.parse(&query);
 
-    // add some globals
-    let mut globals = Variables::new();
-    globals
-        .add(
-            Identifier::from("global_filename"),
-            e.path().to_str().unwrap().into(),
-        )
-        .unwrap();
-
+    let mut graphs = vec![];
     while let Some(entry) = hits.next() {
-        for (_, e) in &entry {
-            node_graph(e, stanzas, &mut globals, tls);
+        for (_, node) in &entry {
+            graphs.push(build_node_graph(node, stanzas, tls));
         }
     }
+    graphs
 }
 
-fn node_graph(
+fn build_node_graph(
     node: &Noeud,
     stanzas: &ast::File,
-    globals: &mut Variables,
     tls: &ThreadLocal<Mutex<Parser>>,
-) {
+) -> Option<serde_json::Value> {
     // reset
-    globals.remove(&Identifier::from("global_row"));
-    globals.remove(&Identifier::from("global_column"));
+    let mut globals = Variables::new();
+    globals
+        .add(Identifier::from("global_filename"), "nate".into())
+        .unwrap();
 
     globals
         .add(
@@ -185,5 +176,11 @@ fn node_graph(
     let graph = stanzas
         .execute(&node_tree, node.ctx_as_str(), &mut config, &NoCancellation)
         .expect(node.ctx_as_str());
+
     println!("{}", graph.pretty_print());
+
+    match graph.node_count() {
+        0 => None,
+        _ => Some(serde_json::to_value(graph).unwrap()),
+    }
 }
