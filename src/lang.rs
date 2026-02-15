@@ -21,7 +21,7 @@ pub trait Lang {
 
     fn build_stanzas(stanzas: String) -> File {
         let lang = Self::language();
-        File::from_str(lang, &stanzas).expect(&format!("invalid tsg:\n{}", &stanzas))
+        File::from_str(lang, &stanzas).expect(&format!("invalid tsg:\n{}", stanzas))
     }
 }
 

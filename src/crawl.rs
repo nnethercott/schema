@@ -7,21 +7,6 @@ use std::sync::Arc;
 
 use crate::lang::Lang;
 
-pub struct CrawlOpts {
-    pub dir: PathBuf,
-    pub threads: usize,
-    pub allowed_exts: Vec<String>,
-}
-
-impl Default for CrawlOpts {
-    fn default() -> Self {
-        Self {
-            dir: "./".into(),
-            threads: 0,
-            allowed_exts: vec![],
-        }
-    }
-}
 pub trait Visitor: Send + Sync {
     type Item;
 
@@ -34,6 +19,12 @@ impl Visitor for DoNothingVisitor {
     type Item = ();
 
     fn visit(&self, _: Self::Item) {}
+}
+
+pub(crate) struct CrawlOpts {
+    pub dir: PathBuf,
+    pub threads: usize,
+    pub allowed_exts: Vec<String>,
 }
 
 impl CrawlOpts {
@@ -49,9 +40,22 @@ impl CrawlOpts {
         self.allowed_exts.push(L::EXT.to_string());
         self
     }
+    pub fn build(self) -> Crawler {
+        Crawler::new(self)
+    }
 }
 
-pub struct Crawler {
+impl Default for CrawlOpts {
+    fn default() -> Self {
+        Self {
+            dir: "./".into(),
+            threads: 0,
+            allowed_exts: vec![],
+        }
+    }
+}
+
+pub(crate) struct Crawler {
     opts: Arc<CrawlOpts>,
 }
 

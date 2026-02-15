@@ -49,7 +49,7 @@ mod decorators {
 // TODO: capture function parameter types
 // TODO: common attributes like line number and such
 
-mod attributes{
+mod attributes {
     #[macro_export]
     macro_rules! common_attributes {
         () => {
@@ -70,7 +70,7 @@ mod stanzas {
     #[macro_export]
     macro_rules! stanza_classes {
         () => {
-        r#"
+            r#"
 ;; classes
 (class_definition
     name: (identifier) @class_name
@@ -145,13 +145,12 @@ mod stanzas {
 
     macro_rules! stanza_calls {
         () => {
-            // TODO: add nodes to nested calls as edges, order by src_code line number 
+            // TODO: add nodes to nested calls as edges, order by src_code line number
             // might involve recursion
-           todo!() 
+            todo!()
         };
     }
 }
-
 
 #[macro_export]
 macro_rules! stanzas {

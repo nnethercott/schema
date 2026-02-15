@@ -1,13 +1,17 @@
-#![allow(dead_code)]
-
-use crate::crawl::{Crawler, Visitor};
-use crate::lang::Lang;
-use crate::parse::Noeud;
+use crate::{
+    IoErrorKind, Result,
+    crawl::{CrawlOpts, Visitor},
+    errors::Error,
+    lang::Lang,
+    parse::Noeud,
+};
 use ignore::DirEntry;
-use madvise::AdviseMemory;
+use madvise::{AccessPattern, AdviseMemory};
 use memmap2::{Mmap, MmapOptions};
+use std::env;
 use std::marker::PhantomData;
-use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::mpsc::{Sender, channel};
+use std::thread::available_parallelism;
 use std::{fs::File, io::Read, path::Path, sync::Mutex};
 use thread_local::ThreadLocal;
 use tree_sitter::{Parser, Query};
@@ -16,6 +20,14 @@ use tree_sitter_graph::{
 };
 
 static MMAP_MIN_SIZE: usize = 8192;
+
+fn available_threads() -> usize {
+    env::var("THREADS")
+        .ok()
+        .and_then(|val| val.parse().ok())
+        .or_else(|| available_parallelism().map(|t| t.get()).ok())
+        .unwrap_or(1)
+}
 
 enum FileBuffer {
     Mapped(Mmap),
@@ -31,28 +43,28 @@ impl FileBuffer {
     }
 }
 
-fn buffered(path: &Path, file_size: usize) -> FileBuffer {
+fn buffered(path: &Path, file_size: usize) -> Result<FileBuffer> {
     if file_size > MMAP_MIN_SIZE {
-        let file = File::open(path).unwrap();
+        let file = File::open(path).map_err(|e| IoErrorKind::open(path, e))?;
         let mmap = unsafe {
-            match MmapOptions::new().map(&file) {
-                Ok(map) => map,
-                Err(_) => panic!("failed to mmap"),
-            }
+            MmapOptions::new()
+                .map(&file)
+                .map_err(|e| IoErrorKind::mmap(path, e))?
         };
+        let _ = mmap.advise_memory_access(AccessPattern::Sequential);
 
-        mmap.advise_memory_access(madvise::AccessPattern::Sequential)
-            .unwrap();
-        return FileBuffer::Mapped(mmap);
+        return Ok(FileBuffer::Mapped(mmap));
     }
 
     // small enough to read into ram
-    let mut file = File::open(path).unwrap();
+    let mut file = File::open(path).map_err(|e| IoErrorKind::open(path, e))?;
     let mut buf = vec![0; file_size];
-    file.read(&mut buf).unwrap();
-    FileBuffer::Raw(buf)
+    file.read(&mut buf)
+        .map_err(|e| IoErrorKind::read(path, e))?;
+    Ok(FileBuffer::Raw(buf))
 }
 
+// NOTE: either do this or ThreadLocal<Cell<Value>> and iter after
 #[derive(Debug, Clone)]
 struct State {
     // pushes subgraphs from thread to an mpsc queue
@@ -71,7 +83,7 @@ impl Visitor for State {
 
 pub struct Draveur<L: Lang> {
     stanzas: ast::File,
-    query: Option<Query>,
+    candidates: Option<Query>,
 
     // marker type for provided language
     _phantom: PhantomData<L>,
@@ -81,72 +93,101 @@ impl<L: Lang + Sync> Draveur<L> {
     pub fn new(stanzas: String) -> Self {
         Self {
             stanzas: L::build_stanzas(stanzas),
-            query: None,
+            candidates: None,
             _phantom: PhantomData,
         }
     }
 
-    pub fn waltz(&self, crawler: Crawler) {
+    pub fn new_with_candidates(stanzas: String, s_expr: String) -> Self {
+        Self {
+            stanzas: L::build_stanzas(stanzas),
+            candidates: Some(L::build_query(s_expr)),
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn waltz(&self, path: &str) -> Result<()> {
         let tls = ThreadLocal::with_capacity(10);
+
         let (tx, rx) = channel();
         let state = State { tx };
 
-        crawler.crawl(|e| self.parse_file(e, &tls), state);
+        let crawler = CrawlOpts::default()
+            .path(path)
+            .threads(available_threads())
+            .add_lang::<L>()
+            .build();
+
+        crawler.crawl(
+            |e| match self.parse_file(e, &tls) {
+                Ok(res) => res,
+                Err(e) => {
+                    panic!("{:?}", e);
+                }
+            },
+            state,
+        );
 
         //consume the queue
         while let Ok(g) = rx.recv() {
-            dbg!(&g);
+            dbg!(g);
         }
+        Ok(())
     }
 
     fn parse_file(
         &self,
-        e: &DirEntry,
+        entry: &DirEntry,
         tls: &ThreadLocal<Mutex<Parser>>,
-    ) -> Vec<Option<serde_json::Value>> {
-        let file_size = e.metadata().unwrap().len() as usize;
-        let buf = buffered(e.path(), file_size);
+    ) -> Result<Vec<Option<serde_json::Value>>> {
+        let file_size = entry.metadata()?.len() as usize;
+        let buf = buffered(entry.path(), file_size)?;
         let bytes = buf.bytes();
 
         // parse source file
         let tree = {
-            let parser_mutex = tls.get_or(|| {
+            let parser_mutex = tls.get_or_try(|| {
                 let mut p = Parser::new();
-                p.set_language(&tree_sitter_python::LANGUAGE.into())
-                    .unwrap();
-                Mutex::new(p)
-            });
-            let mut parser = parser_mutex.lock().unwrap();
+                p.set_language(&L::language())?;
+                Ok::<Mutex<Parser>, Error>(Mutex::new(p))
+            })?;
+
+            let mut parser = parser_mutex.lock().expect("poisoned");
             parser.parse(bytes, None).unwrap()
         };
 
         let root = Noeud::new(tree.root_node(), &bytes);
-        let mut graphs = vec![];
 
-        // TODO: rename self.query
-        match self.query.as_ref() {
-            Some(query) => {
-                let mut hits = root.parse(query);
+        let graphs = match self.candidates.as_ref() {
+            Some(candidates) => {
+                let mut hits = root.parse(candidates);
+                let mut collected = vec![];
 
-                while let Some(entry) = hits.next() {
-                    for (_, node) in &entry {
-                        graphs.push(self.build_node_graph(node, tls));
+                while let Some(hit) = hits.next() {
+                    for (_, node) in &hit {
+                        // if one of the captures fail then so does the full collection
+                        collected.push(self.build_node_graph(node, entry, tls)?);
                     }
                 }
+                collected
             }
-            None => graphs.push(self.build_node_graph(&root, tls)),
-        }
-        graphs
+            None => vec![self.build_node_graph(&root, entry, tls)?],
+        };
+        Ok(graphs)
     }
 
     fn build_node_graph(
         &self,
         node: &Noeud,
+        entry: &DirEntry,
         tls: &ThreadLocal<Mutex<Parser>>,
-    ) -> Option<serde_json::Value> {
+    ) -> Result<Option<serde_json::Value>> {
         let mut globals = Variables::new();
         globals
-            .add(Identifier::from("global_filename"), "nate".into())
+            .add(
+                Identifier::from("global_filename"),
+                entry.path().display().to_string().into(),
+            )
             .unwrap();
         globals
             .add(
@@ -163,13 +204,12 @@ impl<L: Lang + Sync> Draveur<L> {
 
         // parse node sub-tree
         let node_tree = {
-            let parser_mutex = tls.get_or(|| {
+            let parser_mutex = tls.get_or_try(|| {
                 let mut p = Parser::new();
-                p.set_language(&tree_sitter_python::LANGUAGE.into())
-                    .unwrap();
-                Mutex::new(p)
-            });
-            let mut parser = parser_mutex.lock().unwrap();
+                p.set_language(&L::language())?;
+                Ok::<Mutex<Parser>, Error>(Mutex::new(p))
+            })?;
+            let mut parser = parser_mutex.lock().expect("poisoned");
             parser.parse(&node.bytes(), None).unwrap()
         };
 
@@ -185,8 +225,8 @@ impl<L: Lang + Sync> Draveur<L> {
         println!("{}", graph.pretty_print());
 
         match graph.node_count() {
-            0 => None,
-            _ => Some(serde_json::to_value(graph).unwrap()),
+            0 => Ok(None),
+            _ => Ok(Some(serde_json::to_value(graph).unwrap())),
         }
     }
 }
