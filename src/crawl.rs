@@ -5,6 +5,8 @@ use ignore::{DirEntry, WalkBuilder, WalkState};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::lang::Lang;
+
 pub struct CrawlOpts {
     pub dir: PathBuf,
     pub threads: usize,
@@ -43,8 +45,8 @@ impl CrawlOpts {
         self.threads = threads;
         self
     }
-    pub fn add_ext(mut self, ext: &str) -> Self {
-        self.allowed_exts.push(ext.to_string());
+    pub fn add_lang<L: Lang>(mut self) -> Self {
+        self.allowed_exts.push(L::EXT.to_string());
         self
     }
 }
