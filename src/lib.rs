@@ -4,5 +4,4 @@ pub mod crawl;
 pub mod draveur;
 pub mod macros;
 pub mod parse;
-pub mod render;
 pub mod lang;
