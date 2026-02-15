@@ -1,11 +1,10 @@
+use std::fmt::{Debug, Display};
 use std::io;
 use std::path::Path;
-
-// syntax-related enum(query, tsg)
-// ts parsing error
-// anyhow transparent
 use thiserror::Error;
 use tree_sitter::LanguageError;
+
+use crate::lang::Lang;
 
 pub type Result<T> = std::result::Result<T, crate::errors::Error>;
 
@@ -14,15 +13,30 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] IoErrorKind),
 
-    // FIXME: make into a nice struct with the associated `impl Lang` ?
     #[error("language")]
-    Lang(#[from] LanguageError),
+    Lang {
+        language: String,
+        #[source]
+        source: LanguageError,
+    },
+
+    #[error(transparent)]
+    TreeSitter(#[from] TreeSitterError),
 
     #[error(transparent)]
     Crawl(#[from] ignore::Error),
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+}
+
+impl Error {
+    pub fn lang<L: Lang>(source: LanguageError) -> Self {
+        Self::Lang {
+            source,
+            language: L::NAME.into(),
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -67,4 +81,12 @@ impl IoErrorKind {
             source,
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum TreeSitterError {
+    #[error("invalid query\n{0}")]
+    Query(String),
+    #[error("invalid stanzas\n{0}")]
+    Stanzas(String),
 }

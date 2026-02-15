@@ -90,20 +90,20 @@ pub struct Draveur<L: Lang> {
 }
 
 impl<L: Lang + Sync> Draveur<L> {
-    pub fn new(stanzas: String) -> Self {
-        Self {
-            stanzas: L::build_stanzas(stanzas),
+    pub fn new(stanzas: String) -> Result<Self> {
+        Ok(Self {
+            stanzas: L::build_stanzas(stanzas)?,
             candidates: None,
             _phantom: PhantomData,
-        }
+        })
     }
 
-    pub fn new_with_candidates(stanzas: String, s_expr: String) -> Self {
-        Self {
-            stanzas: L::build_stanzas(stanzas),
-            candidates: Some(L::build_query(s_expr)),
+    pub fn new_with_candidates(stanzas: String, s_expr: String) -> Result<Self> {
+        Ok(Self {
+            stanzas: L::build_stanzas(stanzas)?,
+            candidates: Some(L::build_query(s_expr)?),
             _phantom: PhantomData,
-        }
+        })
     }
 
     pub fn waltz(&self, path: &str) -> Result<()> {
@@ -148,7 +148,9 @@ impl<L: Lang + Sync> Draveur<L> {
         let tree = {
             let parser_mutex = tls.get_or_try(|| {
                 let mut p = Parser::new();
-                p.set_language(&L::language())?;
+                p.set_language(&L::language())
+                    .map_err(|e| Error::lang::<L>(e))?;
+
                 Ok::<Mutex<Parser>, Error>(Mutex::new(p))
             })?;
 
@@ -206,7 +208,9 @@ impl<L: Lang + Sync> Draveur<L> {
         let node_tree = {
             let parser_mutex = tls.get_or_try(|| {
                 let mut p = Parser::new();
-                p.set_language(&L::language())?;
+                p.set_language(&L::language())
+                    .map_err(|e| Error::lang::<L>(e))?;
+
                 Ok::<Mutex<Parser>, Error>(Mutex::new(p))
             })?;
             let mut parser = parser_mutex.lock().expect("poisoned");

@@ -4,8 +4,11 @@ use tree_sitter_graph::ast::File;
 #[cfg(feature = "python")]
 pub use python::*;
 
+use crate::{Result, TreeSitterError};
+
 pub trait Lang {
     // Associated file extension for language
+    const NAME: &'static str;
     const EXT: &'static str;
 
     // NOTE: may need an associated type who we can deserialize serde_json::Values into
@@ -14,14 +17,17 @@ pub trait Lang {
     fn language() -> tree_sitter::Language;
 
     // default implementations
-    fn build_query(s_expr: String) -> Query {
+    fn build_query(s_expr: String) -> Result<Query> {
         let lang = Self::language();
-        Query::new(&lang, &s_expr).expect(&format!("invalid ts query:\n{}", s_expr))
+        let query = Query::new(&lang, &s_expr).map_err(|_| TreeSitterError::Query(s_expr))?;
+        Ok(query)
     }
 
-    fn build_stanzas(stanzas: String) -> File {
+    fn build_stanzas(stanzas: String) -> Result<File> {
         let lang = Self::language();
-        File::from_str(lang, &stanzas).expect(&format!("invalid tsg:\n{}", stanzas))
+        let stanzas =
+            File::from_str(lang, &stanzas).map_err(|_| TreeSitterError::Stanzas(stanzas))?;
+        Ok(stanzas)
     }
 }
 
@@ -33,6 +39,7 @@ pub mod python {
     pub struct Python;
 
     impl Lang for Python {
+        const NAME: &'static str = "python";
         const EXT: &'static str = "py";
 
         fn language() -> tree_sitter::Language {
