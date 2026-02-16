@@ -98,7 +98,7 @@ impl Crawler {
                     if is_allowed {
                         visitor.visit(f(&entry));
                     }
-                    return WalkState::Continue;
+                    WalkState::Continue
                 })
             });
     }

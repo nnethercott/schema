@@ -20,6 +20,7 @@ pub trait Lang {
     fn build_query(s_expr: String) -> Result<Query> {
         let lang = Self::language();
         let query = Query::new(&lang, &s_expr).map_err(|_| TreeSitterError::Query(s_expr))?;
+
         Ok(query)
     }
 
