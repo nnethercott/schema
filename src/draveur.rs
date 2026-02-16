@@ -8,13 +8,10 @@ use crate::{
 use ignore::DirEntry;
 use madvise::{AccessPattern, AdviseMemory};
 use memmap2::{Mmap, MmapOptions};
+use std::env;
 use std::marker::PhantomData;
 use std::sync::mpsc::{Sender, channel};
 use std::thread::available_parallelism;
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-};
 use std::{fs::File, io::Read, path::Path, sync::Mutex};
 use thread_local::ThreadLocal;
 use tree_sitter::{Parser, Query};
@@ -158,8 +155,7 @@ where
             })?;
 
             let mut parser = parser_mutex.lock().expect("poisoned");
-            // FIXME: correct parser errors
-            parser.parse(bytes, None).unwrap()
+            parser.parse(bytes, None).ok_or_else(|| Error::Parse)?
         };
 
         let root = Noeud::new(tree.root_node(), bytes);
@@ -215,7 +211,9 @@ where
                 Ok::<Mutex<Parser>, Error>(Mutex::new(p))
             })?;
             let mut parser = parser_mutex.lock().expect("poisoned");
-            parser.parse(node.bytes(), None).unwrap()
+            parser
+                .parse(node.bytes(), None)
+                .ok_or_else(|| Error::Parse)?
         };
 
         // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/execution.rs
@@ -224,10 +222,9 @@ where
 
         let graph = stanzas
             .execute(&node_tree, node.ctx_as_str(), &config, &NoCancellation)
-            //FIXME: add this to errors
             .unwrap_or_else(|_| panic!("{}", node.ctx_as_str()));
 
-        if graph.node_count()>0{
+        if graph.node_count() > 0 {
             println!("{}", graph.pretty_print());
         }
 

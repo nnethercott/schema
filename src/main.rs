@@ -16,8 +16,8 @@ fn main() -> Result<()> {
     );
     let functions = String::from("((module))@all");
 
-    let path = "./";
-    // let path = "/Users/naten/mistral/dashboard/workflow_sdk/";
+    // let path = "./";
+    let path = "/Users/naten/mistral/dashboard/workflow_sdk/";
 
     Draveur::<Python>::new()
         .add(functions, functions_stanzas!())?

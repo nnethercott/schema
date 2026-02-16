@@ -26,6 +26,9 @@ pub enum Error {
     #[error(transparent)]
     Crawl(#[from] ignore::Error),
 
+    #[error("failed to parse tree")]
+    Parse,
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
