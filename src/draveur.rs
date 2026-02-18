@@ -166,6 +166,8 @@ where
             // parse candidate nodes
             let hits = root.parse(cause);
             for hit in hits {
+                // NOTE: this is where recursion would go;
+                // - let mut cur = root, cur = node, self.recursive(n-1, &cur, effect) ...
                 for (_group, node) in &hit {
                     graphs.push(Self::build_node_graph(node, effect, entry, tls)?);
                 }
@@ -215,6 +217,8 @@ where
                 .parse(node.bytes(), None)
                 .ok_or_else(|| Error::Parse)?
         };
+        // dbg!(node_tree.root_node().to_sexp());
+        // println!("{}\n", node.ctx_as_str());
 
         // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/execution.rs
         let functions = Functions::stdlib();

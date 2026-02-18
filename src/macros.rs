@@ -20,7 +20,7 @@ mod decorators {
                         (attribute (_) .) @decorator_name
                     ]
                 ]
-            ) 
+            )
             ;; only capture last decorator if multiple
             @_ ."#
         };
@@ -54,17 +54,75 @@ mod common {
     macro_rules! common_attributes {
         () => {
             r#"
-attribute common_attrs = node => 
-    ;; src = (source-text node), 
+attribute common_attrs = node =>
+    ;; src = (source-text node),
     type = (node-type node),
 
     ;; NOTE: offsets start at first item in the capture -> unintuitive
-    ;; start_col = (plus global_column (start-column node)), 
+    ;; start_col = (plus global_column (start-column node)),
     start_row = (plus global_row (start-row node)),
-    ;; end_col = (plus global_column (end-column node)), 
+    ;; end_col = (plus global_column (end-column node)),
     end_row = (plus global_row (end-row node))
             "#
         };
+    }
+}
+
+mod functions {
+    #[macro_export]
+    macro_rules! functions {
+        () => {
+            r#"
+(module
+  (function_definition
+    name: (identifier) @fn_name
+    parameters: (parameters
+        (_)* @param
+    )
+  ) @fn
+)
+{
+    node @fn.node
+    attr (@fn.node) name = (source-text @fn_name)
+    attr (@fn.node) common_attrs = @fn
+
+    for p in @param {
+        node p.node
+        attr (p.node) value = (source-text p)
+        edge @fn.node -> p.node
+    }
+}
+"#
+        };
+    }
+
+    #[macro_export]
+    macro_rules! functions_stanzas {
+        // stanzas!() - all stanzas
+        () => {
+            format!(
+                r#"
+                    global global_filename
+                    global global_row
+                    global global_column
+                    {}{}
+                "#,
+                $crate::common_attributes!(),
+                $crate::functions!(),
+            )
+        };
+    }
+}
+
+mod expressions {
+    #[macro_export]
+    macro_rules! call {
+        () => {};
+    }
+
+    #[macro_export]
+    macro_rules! assignment {
+        () => {};
     }
 }
 
@@ -126,7 +184,7 @@ mod classes {
                 function_definition
                     name: (identifier) @fn_name
             ) @fn
-        ) 
+        )
     )
 ) @class
 {{
@@ -151,8 +209,8 @@ mod classes {
         () => {
             format!(
                 r#"
-                    global global_filename 
-                    global global_row 
+                    global global_filename
+                    global global_row
                     global global_column
                     {}{}{}{}
                 "#,
@@ -164,41 +222,3 @@ mod classes {
         };
     }
 }
-
-mod functions {
-    #[macro_export]
-    macro_rules! functions {
-        () => {
-            r#"
-(module 
-    (function_definition
-        name: (identifier) @fn_name
-    ) @fn
-)
-{
-    node @fn.node
-    attr (@fn.node) name = (source-text @fn_name)
-    attr (@fn.node) common_attrs = @fn
-}
-"#
-        };
-    }
-
-    #[macro_export]
-    macro_rules! functions_stanzas  {
-        // stanzas!() - all stanzas
-        () => {
-            format!(
-                r#"
-                    global global_filename 
-                    global global_row 
-                    global global_column
-                    {}{}
-                "#,
-                $crate::common_attributes!(),
-                $crate::functions!(),
-            )
-        };
-    }
-}
-
