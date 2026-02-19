@@ -12,6 +12,7 @@ ignore = { version = "0.4.25", features=["simd-accel"] }
 madvise = "0.1.0"
 memmap2 = "0.9.9"
 ouroboros = "0.18.5"
+serde = { version = "1.0.228", features=["derive"] }
 serde_json = "1.0.149"
 streaming-iterator = "0.1.9"
 thiserror = "2.0.18"

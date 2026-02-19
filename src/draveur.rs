@@ -1,9 +1,5 @@
 use crate::{
-    IoErrorKind, Result,
-    crawl::{CrawlOpts, Visitor},
-    errors::Error,
-    lang::Lang,
-    parse::Noeud,
+    IoErrorKind, Result, crawl::{CrawlOpts, Visitor}, errors::Error, lang::Lang, node::Graph, parse::Noeud
 };
 use ignore::DirEntry;
 use madvise::{AccessPattern, AdviseMemory};
@@ -130,7 +126,8 @@ where
 
         //consume the queue
         while let Ok(g) = rx.recv() {
-            // dbg!(g);
+            let graph = Graph::deser(g)?;
+            dbg!(graph);
         }
         Ok(())
     }
@@ -229,7 +226,7 @@ where
             .unwrap_or_else(|_| panic!("{}", node.ctx_as_str()));
 
         if graph.node_count() > 0 {
-            println!("{}", graph.pretty_print());
+            // println!("{}", graph.pretty_print());
         }
 
         match graph.node_count() {

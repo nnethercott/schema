@@ -55,13 +55,13 @@ mod common {
         () => {
             r#"
 attribute common_attrs = node =>
-    ;; src = (source-text node),
+    src = (source-text node),
     type = (node-type node),
 
     ;; NOTE: offsets start at first item in the capture -> unintuitive
-    ;; start_col = (plus global_column (start-column node)),
+    start_col = (plus global_column (start-column node)),
     start_row = (plus global_row (start-row node)),
-    ;; end_col = (plus global_column (end-column node)),
+    end_col = (plus global_column (end-column node)),
     end_row = (plus global_row (end-row node))
             "#
         };
@@ -87,6 +87,7 @@ mod functions {
     attr (@fn.node) common_attrs = @fn
 
     for p in @param {
+        ;; fixme: maybe define function user-side. i don't want node per param
         node p.node
         attr (p.node) value = (source-text p)
         edge @fn.node -> p.node

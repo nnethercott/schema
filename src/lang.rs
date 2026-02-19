@@ -11,8 +11,6 @@ pub trait Lang {
     const NAME: &'static str;
     const EXT: &'static str;
 
-    // NOTE: may need an associated type who we can deserialize serde_json::Values into
-
     //ts language
     fn language() -> tree_sitter::Language;
 
