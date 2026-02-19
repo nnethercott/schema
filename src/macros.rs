@@ -20,7 +20,7 @@ mod decorators {
                         (attribute (_) .) @decorator_name
                     ]
                 ]
-            ) 
+            )
             ;; only capture last decorator if multiple
             @_ ."#
         };
@@ -49,26 +49,86 @@ mod decorators {
 // TODO: capture function parameter types
 // TODO: common attributes like line number and such
 
-mod attributes {
+mod common {
     #[macro_export]
     macro_rules! common_attributes {
         () => {
             r#"
-attribute common_attrs = node => 
-    src = (source-text node), 
+attribute common_attrs = node =>
+    ;; src = (source-text node),
     type = (node-type node),
-    start_col = (plus global_column (start-column node)), 
+
+    ;; NOTE: offsets start at first item in the capture -> unintuitive
+    ;; start_col = (plus global_column (start-column node)),
     start_row = (plus global_row (start-row node)),
-    end_col = (plus global_column (end-column node)), 
-    end_row = (plus global_row (end-row node) 1) ;; note the offset
+    ;; end_col = (plus global_column (end-column node)),
+    end_row = (plus global_row (end-row node))
             "#
         };
     }
 }
 
-mod stanzas {
+mod functions {
     #[macro_export]
-    macro_rules! stanza_classes {
+    macro_rules! functions {
+        () => {
+            r#"
+(module
+  (function_definition
+    name: (identifier) @fn_name
+    parameters: (parameters
+        (_)* @param
+    )
+  ) @fn
+)
+{
+    node @fn.node
+    attr (@fn.node) name = (source-text @fn_name)
+    attr (@fn.node) common_attrs = @fn
+
+    for p in @param {
+        node p.node
+        attr (p.node) value = (source-text p)
+        edge @fn.node -> p.node
+    }
+}
+"#
+        };
+    }
+
+    #[macro_export]
+    macro_rules! functions_stanzas {
+        // stanzas!() - all stanzas
+        () => {
+            format!(
+                r#"
+                    global global_filename
+                    global global_row
+                    global global_column
+                    {}{}
+                "#,
+                $crate::common_attributes!(),
+                $crate::functions!(),
+            )
+        };
+    }
+}
+
+mod expressions {
+    #[macro_export]
+    macro_rules! call {
+        () => {};
+    }
+
+    #[macro_export]
+    macro_rules! assignment {
+        () => {};
+    }
+}
+
+mod classes {
+    #[macro_export]
+    macro_rules! classes {
         () => {
             r#"
 ;; classes
@@ -86,7 +146,7 @@ mod stanzas {
     }
 
     #[macro_export]
-    macro_rules! stanza_methods {
+    macro_rules! methods {
         () => {
             r#"
 ;; methods
@@ -111,7 +171,7 @@ mod stanzas {
     }
 
     #[macro_export]
-    macro_rules! stanza_wrapped_methods {
+    macro_rules! wrapped_methods {
         () => {
             format!(
                 r#"
@@ -124,7 +184,7 @@ mod stanzas {
                 function_definition
                     name: (identifier) @fn_name
             ) @fn
-        ) 
+        )
     )
 ) @class
 {{
@@ -143,31 +203,22 @@ mod stanzas {
         };
     }
 
-    macro_rules! stanza_calls {
+    #[macro_export]
+    macro_rules! class_stanzas {
+        // stanzas!() - all stanzas
         () => {
-            // TODO: add nodes to nested calls as edges, order by src_code line number
-            // might involve recursion
-            todo!()
+            format!(
+                r#"
+                    global global_filename
+                    global global_row
+                    global global_column
+                    {}{}{}{}
+                "#,
+                $crate::common_attributes!(),
+                $crate::classes!(),
+                $crate::methods!(),
+                $crate::wrapped_methods!(),
+            )
         };
     }
-}
-
-#[macro_export]
-macro_rules! stanzas {
-    // stanzas!() - all stanzas
-    () => {
-        format!(
-            r#"
-                global global_filename 
-                global global_row 
-                global global_column
-                {}{}{}{}
-            "#,
-            $crate::common_attributes!(),
-            $crate::stanza_classes!(),
-            $crate::stanza_methods!(),
-            $crate::stanza_wrapped_methods!()
-            // stanza_nested_calls
-        )
-    };
 }

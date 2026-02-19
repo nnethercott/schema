@@ -1,44 +1,22 @@
-from functools import cache
-from collections.abc import Callable
-from typing import Any
-
-def foo(arg: Any):
-    def decorator(f: Callable):
-        def _decorator(*args, **kwargs):
-            print(arg)
-            print(f(*args, **kwargs))
-        return _decorator
-
-    return decorator
-
-@foo("nate")
-def bar():
+import time
+def foo(*args):
+    time.sleep(10)
     pass
 
-@foo(42)
-def nate():
-    print("hi")
 
-@workflows.workflow.define
-class Nate(Bar, Baz):
-    @cache
-    @foo
-    @staticmethod
-    def doubly_decorated(self):
-        pass
+def a(b:int, d, c, a:str|None = None, **kwargs):
+    a = foo()
+    b = 10
+    b
+    a()
+    (i for i in range(10))
+    (
+        foo(a())
+    )
+    while True:
+        c = foo()
 
-    def a_method(self):
-        def inner():
-            pass
 
-    @workflows.activity()
-    def activity_in_class():
-        pass
-
-    @entrypoint
-    def nate(self, args):
-        @workflows.activity()
-        def activity_in_wrapper():
-            pass
-
-class Bar: ...
+    class Foo():
+        def __init__(self):
+            self.foo = "bar"

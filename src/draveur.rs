@@ -38,7 +38,7 @@ impl FileBuffer {
     fn bytes(&self) -> &[u8] {
         match self {
             FileBuffer::Mapped(mmap) => mmap.as_ref(),
-            FileBuffer::Raw(bytes) => &bytes,
+            FileBuffer::Raw(bytes) => bytes,
         }
     }
 }
@@ -75,35 +75,35 @@ impl Visitor for State {
     type Item = Vec<Option<serde_json::Value>>;
 
     fn visit(&self, value: Self::Item) {
-        for v in value.into_iter().filter_map(|g| g) {
+        for v in value.into_iter().flatten() {
             self.tx.send(v).expect("failed to send");
         }
     }
 }
 
 pub struct Draveur<L: Lang> {
-    stanzas: ast::File,
-    candidates: Option<Query>,
+    mappings: Vec<(Query, ast::File)>,
 
     // marker type for provided language
     _phantom: PhantomData<L>,
 }
 
-impl<L: Lang + Sync> Draveur<L> {
-    pub fn new(stanzas: String) -> Result<Self> {
-        Ok(Self {
-            stanzas: L::build_stanzas(stanzas)?,
-            candidates: None,
+impl<L> Draveur<L>
+where
+    L: Lang + Sync,
+{
+    pub fn new() -> Self {
+        Self {
+            mappings: Vec::new(),
             _phantom: PhantomData,
-        })
+        }
     }
 
-    pub fn new_with_candidates(stanzas: String, s_expr: String) -> Result<Self> {
-        Ok(Self {
-            stanzas: L::build_stanzas(stanzas)?,
-            candidates: Some(L::build_query(s_expr)?),
-            _phantom: PhantomData,
-        })
+    pub fn add(&mut self, cause: String, effect: String) -> Result<&mut Self> {
+        let cause = L::build_query(cause)?;
+        let effect = L::build_stanzas(effect)?;
+        self.mappings.push((cause, effect));
+        Ok(self)
     }
 
     pub fn waltz(&self, path: &str) -> Result<()> {
@@ -130,7 +130,7 @@ impl<L: Lang + Sync> Draveur<L> {
 
         //consume the queue
         while let Ok(g) = rx.recv() {
-            dbg!(g);
+            // dbg!(g);
         }
         Ok(())
     }
@@ -155,32 +155,31 @@ impl<L: Lang + Sync> Draveur<L> {
             })?;
 
             let mut parser = parser_mutex.lock().expect("poisoned");
-            parser.parse(bytes, None).unwrap()
+            parser.parse(bytes, None).ok_or_else(|| Error::Parse)?
         };
 
-        let root = Noeud::new(tree.root_node(), &bytes);
+        let root = Noeud::new(tree.root_node(), bytes);
+        let mut graphs = vec![];
 
-        let graphs = match self.candidates.as_ref() {
-            Some(candidates) => {
-                let mut hits = root.parse(candidates);
-                let mut collected = vec![];
-
-                while let Some(hit) = hits.next() {
-                    for (_, node) in &hit {
-                        // if one of the captures fail then so does the full collection
-                        collected.push(self.build_node_graph(node, entry, tls)?);
-                    }
+        // iterate over all the capture groups
+        for (cause, effect) in &self.mappings {
+            // parse candidate nodes
+            let hits = root.parse(cause);
+            for hit in hits {
+                // NOTE: this is where recursion would go;
+                // - let mut cur = root, cur = node, self.recursive(n-1, &cur, effect) ...
+                for (_group, node) in &hit {
+                    graphs.push(Self::build_node_graph(node, effect, entry, tls)?);
                 }
-                collected
             }
-            None => vec![self.build_node_graph(&root, entry, tls)?],
-        };
+        }
+
         Ok(graphs)
     }
 
     fn build_node_graph(
-        &self,
         node: &Noeud,
+        stanzas: &ast::File,
         entry: &DirEntry,
         tls: &ThreadLocal<Mutex<Parser>>,
     ) -> Result<Option<serde_json::Value>> {
@@ -214,19 +213,24 @@ impl<L: Lang + Sync> Draveur<L> {
                 Ok::<Mutex<Parser>, Error>(Mutex::new(p))
             })?;
             let mut parser = parser_mutex.lock().expect("poisoned");
-            parser.parse(&node.bytes(), None).unwrap()
+            parser
+                .parse(node.bytes(), None)
+                .ok_or_else(|| Error::Parse)?
         };
+        // dbg!(node_tree.root_node().to_sexp());
+        // println!("{}\n", node.ctx_as_str());
 
         // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/execution.rs
         let functions = Functions::stdlib();
-        let mut config = ExecutionConfig::new(&functions, &globals).lazy(true);
+        let config = ExecutionConfig::new(&functions, &globals).lazy(true);
 
-        let graph = self
-            .stanzas
-            .execute(&node_tree, node.ctx_as_str(), &mut config, &NoCancellation)
-            .expect(node.ctx_as_str());
+        let graph = stanzas
+            .execute(&node_tree, node.ctx_as_str(), &config, &NoCancellation)
+            .unwrap_or_else(|_| panic!("{}", node.ctx_as_str()));
 
-        println!("{}", graph.pretty_print());
+        if graph.node_count() > 0 {
+            println!("{}", graph.pretty_print());
+        }
 
         match graph.node_count() {
             0 => Ok(None),

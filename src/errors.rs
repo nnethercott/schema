@@ -1,8 +1,9 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::io;
 use std::path::Path;
 use thiserror::Error;
-use tree_sitter::LanguageError;
+use tree_sitter::{LanguageError, QueryError};
+use tree_sitter_graph::ParseError;
 
 use crate::lang::Lang;
 
@@ -25,6 +26,9 @@ pub enum Error {
 
     #[error(transparent)]
     Crawl(#[from] ignore::Error),
+
+    #[error("failed to parse tree")]
+    Parse,
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
@@ -85,8 +89,8 @@ impl IoErrorKind {
 
 #[derive(Error, Debug)]
 pub enum TreeSitterError {
-    #[error("invalid query\n{0}")]
-    Query(String),
-    #[error("invalid stanzas\n{0}")]
-    Stanzas(String),
+    #[error("invalid query: {0}\n{1}")]
+    Query(QueryError, String),
+    #[error("invalid stanzas: {0}\n{1}")]
+    Stanzas(ParseError, String),
 }
