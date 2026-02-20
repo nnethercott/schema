@@ -14,13 +14,14 @@ fn main() -> Result<()> {
         "workflows.activity",
         "foo"
     );
-    let functions = String::from("((module)) @all");
+    // let functions = String::from("((module)) @all");
+    let functions = String::from("(function_definition)@fn");
 
     Draveur::<Python>::new()
         .add(functions, functions_stanzas!())?
         .add(classes, class_stanzas!())?
         .waltz("./")?;
-        // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
+    // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
 
     println!("{:?}", now.elapsed());
     Ok(())

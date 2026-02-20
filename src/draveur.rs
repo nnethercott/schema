@@ -1,5 +1,10 @@
 use crate::{
-    IoErrorKind, Result, crawl::{CrawlOpts, Visitor}, errors::Error, lang::Lang, node::Graph, parse::Noeud
+    IoErrorKind, Result,
+    crawl::{CrawlOpts, Visitor},
+    errors::Error,
+    lang::Lang,
+    node::{Graph, merge},
+    parse::Noeud,
 };
 use ignore::DirEntry;
 use madvise::{AccessPattern, AdviseMemory};
@@ -124,11 +129,19 @@ where
             state,
         );
 
-        //consume the queue
+        //consume the queue for ALL files
+        let mut graphs = vec![];
         while let Ok(g) = rx.recv() {
             let graph = Graph::deser(g)?;
-            dbg!(graph);
+            graphs.push(graph);
         }
+
+        // entity linking
+        merge(&mut graphs, |leaf, root| {
+            leaf.get("name") == root.get("name")
+        });
+        dbg!(graphs);
+
         Ok(())
     }
 
@@ -163,9 +176,8 @@ where
             // parse candidate nodes
             let hits = root.parse(cause);
             for hit in hits {
-                // NOTE: this is where recursion would go;
-                // - let mut cur = root, cur = node, self.recursive(n-1, &cur, effect) ...
                 for (_group, node) in &hit {
+                    dbg!(&node);
                     graphs.push(Self::build_node_graph(node, effect, entry, tls)?);
                 }
             }

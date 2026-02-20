@@ -73,14 +73,12 @@ mod functions {
     macro_rules! functions {
         () => {
             r#"
-(module
   (function_definition
     name: (identifier) @fn_name
     parameters: (parameters
         (_)* @param
     )
   ) @fn
-)
 {
     node @fn.node
     attr (@fn.node) name = (source-text @fn_name)

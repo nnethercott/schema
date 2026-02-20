@@ -1,8 +1,8 @@
-@workflows.workflow.define
-class Foo():
-    def __init__(self):
-        self.foo = "bar"
+def foo():
+    pass
 
-    @workflows.activity(name="nate")
-    def bar(self):
+def bar():
+    # should resolve here
+    def foo():
         pass
+
