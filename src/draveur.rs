@@ -137,9 +137,9 @@ where
         }
 
         // entity linking
-        merge(&mut graphs, |leaf, root| {
-            leaf.get("name") == root.get("name")
-        });
+        // merge(&mut graphs, |leaf, root| {
+        //     leaf.get("name") == root.get("name")
+        // });
         dbg!(graphs);
 
         Ok(())
@@ -235,7 +235,7 @@ where
 
         let graph = stanzas
             .execute(&node_tree, node.ctx_as_str(), &config, &NoCancellation)
-            .unwrap_or_else(|_| panic!("{}", node.ctx_as_str()));
+            .unwrap_or_else(|e| panic!("{:?}\n{}", e, node.ctx_as_str()));
 
         if graph.node_count() > 0 {
             // println!("{}", graph.pretty_print());

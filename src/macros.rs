@@ -46,9 +46,6 @@ mod decorators {
     }
 }
 
-// TODO: capture function parameter types
-// TODO: common attributes like line number and such
-
 mod common {
     #[macro_export]
     macro_rules! common_attributes {
@@ -72,26 +69,52 @@ mod functions {
     #[macro_export]
     macro_rules! functions {
         () => {
-            r#"
-  (function_definition
-    name: (identifier) @fn_name
-    parameters: (parameters
-        (_)* @param
-    )
-  ) @fn
-{
+            format!(
+                r#"
+(function_definition
+  name: (identifier) @fn_name
+) @fn
+{{
     node @fn.node
-    attr (@fn.node) name = (source-text @fn_name)
     attr (@fn.node) common_attrs = @fn
-
-    for p in @param {
-        ;; fixme: maybe define function user-side. i don't want node per param
-        node p.node
-        attr (p.node) value = (source-text p)
-        edge @fn.node -> p.node
+    attr (@fn.node) name = (source-text @fn_name)
+}}
+"#,
+            )
+        };
     }
-}
-"#
+
+    #[macro_export]
+    macro_rules! params {
+        () => {
+            format!(
+                r#"
+(function_definition
+  parameters: ((_) @params (#not-eq? @params "()"))
+) @fn
+{{
+    attr (@fn.node) params = (source-text @params)
+}}
+"#,
+            )
+        };
+    }
+
+    #[macro_export]
+    macro_rules! returns {
+        () => {
+            format!(
+                r#"
+(function_definition
+  return_type: (_)? @returns
+) @fn
+{{
+    if some @returns{{
+        attr (@fn.node) returns = (source-text @returns)
+    }}
+}}
+"#,
+            )
         };
     }
 
@@ -104,10 +127,12 @@ mod functions {
                     global global_filename
                     global global_row
                     global global_column
-                    {}{}
+                    {}{}{}{}
                 "#,
                 $crate::common_attributes!(),
                 $crate::functions!(),
+                $crate::params!(),
+                $crate::returns!(),
             )
         };
     }
@@ -158,8 +183,8 @@ mod classes {
 ) @class
 {
     node @fn.node
-    attr (@fn.node) name = (source-text @fn_name)
     attr (@fn.node) common_attrs = @fn
+    attr (@fn.node) name = (source-text @fn_name)
 
     ;; edge annotations
     edge @class.node -> @fn.node
@@ -211,12 +236,14 @@ mod classes {
                     global global_filename
                     global global_row
                     global global_column
-                    {}{}{}{}
+                    {}{}{}{}{}{}
                 "#,
                 $crate::common_attributes!(),
                 $crate::classes!(),
                 $crate::methods!(),
                 $crate::wrapped_methods!(),
+                $crate::params!(),
+                $crate::returns!(),
             )
         };
     }

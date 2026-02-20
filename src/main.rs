@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     let functions = String::from("(function_definition)@fn");
 
     Draveur::<Python>::new()
-        .add(functions, functions_stanzas!())?
+        // .add(functions, functions_stanzas!())?
         .add(classes, class_stanzas!())?
         .waltz("./")?;
     // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
