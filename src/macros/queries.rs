@@ -49,7 +49,7 @@ mod queries {
 
     /// General decorated objects capture
     #[macro_export]
-    macro_rules! decorated_objects {
+    macro_rules! query_decorated_objects {
         // dec!()
         () => {
             format!("(decorated_definition ({})) @body", $crate::_decorator!())
@@ -64,5 +64,19 @@ mod queries {
                 allowlist
             )
         }};
+    }
+
+    #[macro_export]
+    macro_rules! query_functions {
+        () => {
+           "(module (function_definition) @fn)"
+        };
+    }
+
+    #[macro_export]
+    macro_rules! query_classes {
+        () => {
+           "(class_definition) @class" 
+        };
     }
 }

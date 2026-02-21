@@ -58,7 +58,9 @@ mod classes {
 
     ;; edge annotations
     edge @class.node -> @fn.node
-    attr (@class.node -> @fn.node) relation = "method"
+    edge @fn.node -> @class.node
+    attr (@class.node -> @fn.node) kind = "method"
+    attr (@fn.node -> @class.node) kind = "_parent"
 }
 "#
         };
@@ -129,7 +131,9 @@ mod classes {
 
     ;; edge annotations
     edge @class.node -> @fn.node
-    attr (@class.node -> @fn.node) relation = "method"
+    edge @fn.node -> @class.node
+    attr (@class.node -> @fn.node) kind = "method"
+    attr (@fn.node -> @class.node) kind = "_parent"
 }}
 "#,
                 $crate::decorator!()
@@ -196,6 +200,74 @@ mod classes {
     }
 
     #[macro_export]
+    macro_rules! methods_calls {
+        () => {
+            format!(
+                r#"
+;; method calls
+(class_definition
+    body: (block
+        (function_definition
+            {}
+        ) @fn
+    )
+)
+{{
+    node @call.node
+    attr (@call.node) common_attrs = @call
+    attr (@call.node) name = (source-text @call_name)
+
+    ;; edge annotations
+    edge @fn.node -> @call.node
+    edge @call.node -> @fn.node
+    attr (@fn.node -> @call.node) kind = "call"
+    attr (@call.node -> @fn.node) kind = "_parent"
+}}
+"#,
+                $crate::_body_calls!()
+            )
+        };
+    }
+
+    #[macro_export]
+    macro_rules! wrapped_methods_calls {
+        () => {
+            format!(
+                r#"
+;; wrapped method calls
+(class_definition
+    body: (block
+        (decorated_definition
+            {}
+            definition: (
+                function_definition
+                    {}
+            ) @fn
+        )
+    )
+)
+{{
+    node @call.node
+    attr (@call.node) common_attrs = @call
+    attr (@call.node) name = (source-text @call_name)
+
+    ;; edge annotations
+    edge @fn.node -> @call.node
+    edge @call.node -> @fn.node
+    attr (@fn.node -> @call.node) kind = "call"
+    attr (@call.node -> @fn.node) kind = "_parent"
+
+    ;; hack: all captures must be used
+    let _ = @decorator_name
+}}
+"#,
+                $crate::decorator!(),
+                $crate::_body_calls!()
+            )
+        };
+    }
+
+    #[macro_export]
     macro_rules! class_stanzas {
         // stanzas!() - all stanzas
         () => {
@@ -204,7 +276,7 @@ mod classes {
                     global global_filename
                     global global_row
                     global global_column
-                    {}{}{}{}{}{}{}{}{}
+                    {}{}{}{}{}{}{}{}{}{}{}
                 "#,
                 $crate::common_attributes!(),
                 $crate::classes!(),
@@ -212,9 +284,11 @@ mod classes {
                 $crate::methods!(),
                 $crate::methods_params!(),
                 $crate::methods_returns!(),
+                $crate::methods_calls!(),
                 $crate::wrapped_methods!(),
                 $crate::wrapped_methods_params!(),
                 $crate::wrapped_methods_returns!(),
+                $crate::wrapped_methods_calls!(),
             )
         };
     }

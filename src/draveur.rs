@@ -101,13 +101,12 @@ where
     }
 
     pub fn add(&mut self, cause: String, effect: String) -> Result<&mut Self> {
-        let cause = L::build_query(cause)?;
-        let effect = L::build_stanzas(effect)?;
-        self.mappings.push((cause, effect));
+        self.mappings
+            .push((L::build_query(cause)?, L::build_stanzas(effect)?));
         Ok(self)
     }
 
-    pub fn waltz(&self, path: &str) -> Result<()> {
+    pub fn waltz(&self, path: &str) -> Result<Vec<Graph>> {
         let tls = ThreadLocal::with_capacity(10);
 
         let (tx, rx) = channel();
@@ -137,12 +136,12 @@ where
         }
 
         // entity linking
-        merge(&mut graphs, |leaf, root| {
-            leaf.get("src") == root.get("src")
-        });
-        dbg!(graphs);
+        // TODO: hide behind feature flag
+        // merge(&mut graphs, |leaf, root| {
+        //     leaf.get("src") == root.get("src")
+        // });
 
-        Ok(())
+        Ok(graphs)
     }
 
     fn parse_file(

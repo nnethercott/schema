@@ -13,8 +13,6 @@ pub(crate) type NodeId = usize;
 
 static ATOMIC_UID: AtomicUsize = AtomicUsize::new(0);
 
-// TODO: custom serializer for Value so stuff comes out flat ?
-
 #[derive(Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum Value {

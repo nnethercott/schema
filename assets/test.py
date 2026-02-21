@@ -1,3 +1,12 @@
+def foo():
+    if True:
+        pass
+    elif 1==2:
+        pass
+    else:
+        foo()
+    pass
+
 @workflows.workflow.define("failing-tool-call-workflow")
 class FailingToolCallWorkflow:
     @workflows.workflow.entrypoint

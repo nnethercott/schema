@@ -66,7 +66,7 @@ mod functions {
     }
 
     #[macro_export]
-    macro_rules! function_calls {
+    macro_rules! calls {
         () => {
             format!(
                 r#"
@@ -80,7 +80,9 @@ mod functions {
 
     ;; edge annotations
     edge @fn.node -> @call.node
-    attr (@fn.node -> @call.node) relation = "call"
+    edge @call.node -> @fn.node 
+    attr (@fn.node -> @call.node) kind = "call"
+    attr (@call.node -> @fn.node) kind = "_parent"
 }}
             "#,
                 $crate::_body_calls!()
@@ -97,14 +99,15 @@ mod functions {
                     global global_filename
                     global global_row
                     global global_column
-                    {}{}{}{}{}{}
+                    {}{}{}{}{}{}{}
                 "#,
                 $crate::common_attributes!(),
                 $crate::functions!(),
                 $crate::wrapped_functions!(),
                 $crate::params!(),
                 $crate::returns!(),
-                $crate::function_calls!(),
+                $crate::calls!(),
+                $crate::conditionals!(),
             )
         };
     }

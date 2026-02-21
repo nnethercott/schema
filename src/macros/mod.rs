@@ -1,7 +1,8 @@
+mod calls;
 mod classes;
+mod conditionals;
 mod functions;
 mod queries;
-mod calls;
 
 mod common {
     #[macro_export]
