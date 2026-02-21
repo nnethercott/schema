@@ -1,31 +1,8 @@
-# def foo(*args):
-#     pass
-#
-#
-# def bar():
-#     # should resolve here
-#     def foo():
-#         pass
-#
-#     a = foo()
-#
-#
-# b = bar()
-#
-#
-# @foo()
-# class Nate:
-#     def __init__(self, b, a: int, *args, **kwargs):
-#         pass
-#
-#     def method(self, a: int) -> tuple[str,str]:
-#         pass
-
 @workflows.workflow.define("failing-tool-call-workflow")
 class FailingToolCallWorkflow:
     @workflows.workflow.entrypoint
     async def entrypoint(self) -> None:
-        session = workflows_mistralai.RemoteSession()
+        session = await workflows_mistralai.RemoteSession()
 
         class WebSearchParams(BaseModel):
             query: str
@@ -45,7 +22,7 @@ class FailingToolCallWorkflow:
             tools=[do_web_search],
         )
         logger.info("Workflow: Running agent")
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(Exception) as nate:
             await workflows_mistralai.Runner.run(
                 agent=agent,
                 inputs="Call do_web_search tool with query 'What is the weather today?'",

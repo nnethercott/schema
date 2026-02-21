@@ -137,9 +137,9 @@ where
         }
 
         // entity linking
-        // merge(&mut graphs, |leaf, root| {
-        //     leaf.get("name") == root.get("name")
-        // });
+        merge(&mut graphs, |leaf, root| {
+            leaf.get("src") == root.get("src")
+        });
         dbg!(graphs);
 
         Ok(())

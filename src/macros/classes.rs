@@ -58,7 +58,7 @@ mod classes {
 
     ;; edge annotations
     edge @class.node -> @fn.node
-    attr (@class.node -> @fn.node) rel = "method"
+    attr (@class.node -> @fn.node) relation = "method"
 }
 "#
         };
@@ -129,7 +129,7 @@ mod classes {
 
     ;; edge annotations
     edge @class.node -> @fn.node
-    attr (@class.node -> @fn.node) rel = "method"
+    attr (@class.node -> @fn.node) relation = "method"
 }}
 "#,
                 $crate::decorator!()

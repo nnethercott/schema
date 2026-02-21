@@ -66,6 +66,29 @@ mod functions {
     }
 
     #[macro_export]
+    macro_rules! function_calls {
+        () => {
+            format!(
+                r#"
+(function_definition
+{}
+) @fn
+{{
+    node @call.node
+    attr (@call.node) common_attrs = @call
+    attr (@call.node) name = (source-text @call_name)
+
+    ;; edge annotations
+    edge @fn.node -> @call.node
+    attr (@fn.node -> @call.node) relation = "call"
+}}
+            "#,
+                $crate::_body_calls!()
+            )
+        };
+    }
+
+    #[macro_export]
     macro_rules! functions_stanzas {
         // stanzas!() - all stanzas
         () => {
@@ -74,26 +97,15 @@ mod functions {
                     global global_filename
                     global global_row
                     global global_column
-                    {}{}{}{}{}
+                    {}{}{}{}{}{}
                 "#,
                 $crate::common_attributes!(),
                 $crate::functions!(),
                 $crate::wrapped_functions!(),
                 $crate::params!(),
                 $crate::returns!(),
+                $crate::function_calls!(),
             )
         };
-    }
-}
-
-mod expressions {
-    #[macro_export]
-    macro_rules! call {
-        () => {};
-    }
-
-    #[macro_export]
-    macro_rules! assignment {
-        () => {};
     }
 }
