@@ -1,12 +1,12 @@
 use draveur::{
-    Result, class_stanzas, decorated_objects, draveur::Draveur, functions_stanzas, lang::Python,
+    Result, class_stanzas, draveur::Draveur, functions_stanzas, lang::Python, query_decorated_classes,
 };
 use std::time::Instant;
 
 fn main() -> Result<()> {
     let now = Instant::now();
 
-    let classes = decorated_objects!(
+    let classes = query_decorated_classes!(
         "workflows.workflow.define",
         "workflows.update",
         "workflows.query",
@@ -14,14 +14,14 @@ fn main() -> Result<()> {
         "workflows.activity",
         "foo"
     );
-    // let functions = String::from("((module)) @all");
-    let functions = String::from("(function_definition)@fn");
+    let functions = String::from("((module)) @all");
+    // let functions = String::from("(function_definition)@fn");
 
     Draveur::<Python>::new()
-        // .add(functions, functions_stanzas!())?
+        .add(functions, functions_stanzas!())?
         .add(classes, class_stanzas!())?
         .waltz("./")?;
-    // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
+        // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
 
     println!("{:?}", now.elapsed());
     Ok(())

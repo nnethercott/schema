@@ -38,6 +38,11 @@ Ideally this diagram would be rendered _fast_ and _automatically_ without needin
 - [x] node parsing and hierarchy resolving with tree-sitter 
 - [ ] diagram rendering with [`mmdr`](https://github.com/1jehuang/mermaid-rs-renderer) in ascii and svg
 - [ ] clap cli
-- [ ] optimizations (concurrency(?) mmemap, etc)
+- [x] optimizations (concurrency(?) mmemap, etc)
 - [ ] maturin bindings
 - [ ] tests
+
+# limitations
+- functions within functions within classes
+  - to match these patterns we'd need @class @fn (@fn2)? since we need to create edges between them
+  - for normal functions this is fine
