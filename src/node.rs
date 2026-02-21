@@ -5,13 +5,15 @@ use std::{
 };
 
 use roaring::RoaringBitmap;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 
 use crate::Result;
 pub(crate) type Attributes = HashMap<String, Value>;
 pub(crate) type NodeId = usize;
 
 static ATOMIC_UID: AtomicUsize = AtomicUsize::new(0);
+
+// TODO: custom serializer for Value so stuff comes out flat ?
 
 #[derive(Deserialize, PartialEq, Clone)]
 #[serde(tag = "type")]
@@ -26,6 +28,21 @@ pub enum Value {
     String { string: String },
     #[serde(rename = "list")]
     List { list: Vec<Value> },
+}
+
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Value::Null => serializer.serialize_none(),
+            Value::Boolean { bool } => serializer.serialize_bool(*bool),
+            Value::Integer { int } => serializer.serialize_u32(*int),
+            Value::String { string } => serializer.serialize_str(string),
+            Value::List { list } => list.serialize(serializer),
+        }
+    }
 }
 
 impl Debug for Value {
@@ -67,14 +84,14 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Edge {
     sink: NodeId,
     attrs: Attributes,
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Node {
     id: NodeId,
     edges: Vec<Edge>,
@@ -96,7 +113,7 @@ impl Node {
 }
 
 //NOTE: i'm making the assumption that graphs are already serialized with nodes in order
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Graph(Vec<Node>);
 
 impl Graph {
@@ -106,10 +123,28 @@ impl Graph {
         Ok(graph)
     }
 
-    /// ensure subgraphs each have unique node ids
+    /// ensure subgraphs each have globally unique node ids
     fn init(&mut self) {
-        for node in self.iter_mut() {
+        let mut node_iter = self.iter_mut();
+
+        fn _offset_edges(node: &mut Node, offset: NodeId) {
+            for edge in node.edges.iter_mut() {
+                edge.sink += offset;
+            }
+        }
+
+        let root_id = match node_iter.next() {
+            Some(root) => {
+                root.id = ATOMIC_UID.fetch_add(1, Ordering::Relaxed);
+                _offset_edges(root, root.id);
+                root.id
+            }
+            None => return,
+        };
+
+        for node in node_iter {
             node.id = ATOMIC_UID.fetch_add(1, Ordering::Relaxed);
+            _offset_edges(node, root_id);
         }
     }
 
@@ -163,7 +198,7 @@ where
         .filter_map(|g| g.root().map(|n| n.clone()))
         .collect();
 
-    // FIXME: O(n^3) :// 
+    // FIXME: O(n^3) ://
     // observe: each graph can be processed independently
     for g in graphs.iter_mut() {
         for leaf in g.iter_leafs_mut() {
