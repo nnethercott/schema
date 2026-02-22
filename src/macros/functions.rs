@@ -11,6 +11,7 @@ mod functions {
     node @fn.node
     attr (@fn.node) common_attrs = @fn
     attr (@fn.node) name = (source-text @fn_name)
+    attr (@fn.node) filename = global_filename
 }
 "#
         };

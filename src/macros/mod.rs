@@ -14,9 +14,9 @@ attribute common_attrs = node =>
     type = (node-type node),
 
     ;; NOTE: offsets start at first item in the capture -> unintuitive
-    ;;start_col = (plus global_column (start-column node)),
+    start_col = (plus global_column (start-column node)),
     start_row = (plus global_row (start-row node)),
-    ;; end_col = (plus global_column (end-column node)),
+    end_col = (plus global_column (end-column node)),
     end_row = (plus global_row (end-row node))
             "#
         };

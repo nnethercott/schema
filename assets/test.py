@@ -7,6 +7,8 @@ def foo():
         foo()
     pass
 
+    foo()
+
 @workflows.workflow.define("failing-tool-call-workflow")
 class FailingToolCallWorkflow:
     @workflows.workflow.entrypoint
