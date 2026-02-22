@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Draveur Graph Viewer</title>
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+  <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+  <style>
+    @font-face {
+      font-family: 'Symbols Nerd Font';
+      src: url('https://cdn.jsdelivr.net/gh/ryanoasis/nerd-fonts@master/patched-fonts/NerdFontsSymbolsOnly/SymbolsNerdFontMono-Regular.ttf') format('truetype');
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; height: 100vh; }
+    #cy { flex: 1; background: #fff; }
+    #panel { width: 320px; background: #fafafa; border-left: 1px solid #e5e5e5; padding: 16px; overflow-y: auto; }
+    #panel h3 { margin-bottom: 12px; color: #666; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    #file-select { width: 100%; padding: 8px; font-size: 12px; font-family: 'SF Mono', Consolas, monospace; border: 1px solid #e5e5e5; border-radius: 4px; background: #fff; cursor: pointer; }
+    #props { font-size: 12px; }
+    #props .empty { color: #999; padding: 12px; }
+    #props .prop { margin-bottom: 8px; }
+    #props .key { color: #666; font-size: 11px; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 2px; }
+    #props .value { background: #fff; padding: 6px 8px; border-radius: 4px; border: 1px solid #e5e5e5; font-family: 'SF Mono', Consolas, monospace; word-break: break-word; }
+    #props .value.code, #tooltip { background: #1e1e1e; color: #d4d4d4; white-space: pre; overflow-x: auto; }
+    #props .value.code { max-height: 200px; position: relative; }
+    #props .value.code .copy-btn { position: absolute; top: 4px; right: 4px; padding: 4px 6px; background: #333; border: none; border-radius: 3px; color: #aaa; cursor: pointer; font-size: 12px; opacity: 0; transition: opacity 0.15s; }
+    #props .value.code:hover .copy-btn { opacity: 1; }
+    #props .value.code .copy-btn:hover { background: #444; color: #fff; }
+    #tooltip { position: absolute; padding: 12px; border-radius: 6px; max-width: 600px; max-height: 400px; overflow: auto; pointer-events: none; display: none; z-index: 1000; box-shadow: 0 4px 16px rgba(0,0,0,0.25); border: 1px solid #3c3c3c; }
+    #tooltip pre { margin: 0; font-family: 'SF Mono', Consolas, monospace; font-size: 12px; line-height: 1.5; }
+    [data-t="kw"], [data-t="const"] { color: #569cd6; font-style: normal; }
+    [data-t="cf"] { color: #c586c0; font-style: normal; }
+    [data-t="fn"], [data-t="dec"] { color: #dcdcaa; font-style: normal; }
+    [data-t="str"] { color: #ce9178; font-style: normal; }
+    [data-t="num"] { color: #b5cea8; font-style: normal; }
+    [data-t="cmt"] { color: #6a9955; }
+    [data-t="cls"] { color: #4ec9b0; font-style: normal; }
+    #status { position: fixed; top: 12px; left: 12px; padding: 5px 10px; background: #22c55e; color: white; border-radius: 4px; font-size: 11px; }
+    #status.error { background: #ef4444; }
+    #status.disconnected { background: #9ca3af; }
+    #toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); padding: 8px 16px; background: #333; color: #fff; border-radius: 4px; font-size: 12px; font-family: 'SF Mono', Consolas, monospace; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="cy"></div>
+  <div id="panel">
+    <h3>File</h3>
+    <select id="file-select"></select>
+    <h3 style="margin-top: 16px;">Node Properties</h3>
+    <div id="props"><div class="empty">Click a node to view properties</div></div>
+  </div>
+  <div id="tooltip"></div>
+  <div id="status">Connecting...</div>
+  <div id="toast"></div>
+
+  <script>
+    const ICONS = {
+      function_definition: '\u0192', method: '\uea8c', class_definition: '\ueb5b',
+      call: '\uf120', block: '\u22a2', if_statement: '\u2387'
+    };
+
+    const $ = id => document.getElementById(id);
+    const tooltip = $('tooltip'), propsEl = $('props'), statusEl = $('status'), toastEl = $('toast'), fileSelect = $('file-select');
+
+    let ws, allGraphData = [], selectedFile = null, toastTimeout;
+
+    const cy = cytoscape({
+      container: $('cy'),
+      style: [
+        { selector: 'node', style: {
+          'label': 'data(label)', 'background-color': '#f5f5f5', 'color': '#333',
+          'text-valign': 'center', 'text-halign': 'center',
+          'font-family': '"Symbols Nerd Font", "SF Mono", Consolas, monospace',
+          'font-size': '11px', 'width': 'label', 'height': 28, 'padding': '10px',
+          'shape': 'round-rectangle', 'text-wrap': 'none', 'border-width': 1, 'border-color': '#ddd'
+        }},
+        { selector: 'node.root', style: { 'background-color': '#e8e8e8', 'border-color': '#bbb', 'font-weight': '600' }},
+        { selector: 'node[type="function_definition"]', style: { 'background-color': '#e8f5e9', 'border-color': '#a5d6a7' }},
+        { selector: 'node[type="class_definition"]', style: { 'background-color': '#e3f2fd', 'border-color': '#90caf9' }},
+        { selector: 'node[type="call"]', style: { 'background-color': '#fff', 'border-color': '#ccc', 'border-style': 'dashed' }},
+        { selector: 'node[type="block"], node[type="if_statement"]', style: { 'background-color': '#fafafa', 'border-color': '#ddd' }},
+        { selector: 'edge', style: { 'width': 1, 'line-color': '#999', 'target-arrow-color': '#999', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'arrow-scale': 0.6 }},
+        { selector: 'edge[kind="branch"], edge[kind="method"], edge[kind="if-else"]', style: { 'line-style': 'dashed' }},
+        { selector: 'edge[condition]', style: { 'label': 'data(condition)', 'font-size': '10px', 'font-family': '"SF Mono", Consolas, monospace', 'text-background-color': '#fff', 'text-background-opacity': 0.9, 'text-background-padding': '2px', 'color': '#666' }},
+        { selector: 'node:selected', style: { 'border-width': 2, 'border-color': '#666' }},
+        { selector: 'edge:selected', style: { 'width': 2, 'line-color': '#666', 'target-arrow-color': '#666' }}
+      ],
+      layout: { name: 'grid' }
+    });
+
+    const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    function highlightPython(code) {
+      return escapeHtml(code)
+        .replace(/(#.*$)/gm, '<i data-t="cmt">$1</i>')
+        .replace(/("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, '<i data-t="str">$1</i>')
+        .replace(/(@[a-zA-Z_][a-zA-Z0-9_.]*)/g, '<i data-t="dec">$1</i>')
+        .replace(/\b(if|elif|else|for|while|return|try|except|finally|with|raise|pass|break|continue|and|or|not|in|is|lambda|yield)\b/g, '<i data-t="cf">$1</i>')
+        .replace(/\b(def|class|import|from|as|async|await|global|nonlocal)\b/g, '<i data-t="kw">$1</i>')
+        .replace(/\b(None|True|False|self)\b/g, '<i data-t="const">$1</i>')
+        .replace(/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g, '<i data-t="fn">$1</i>(')
+        .replace(/\b(\d+\.?\d*)\b/g, '<i data-t="num">$1</i>')
+        .replace(/(<i data-t="kw">class<\/i>\s+)([A-Za-z_][A-Za-z0-9_]*)/g, '$1<i data-t="cls">$2</i>');
+    }
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => toastEl.classList.remove('show'), 3000);
+    }
+
+    function transformGraph(data) {
+      const nodes = Array.isArray(data[0]) ? data.flat() : data;
+      const nodeMap = new Map(nodes.map(n => [String(n.id), n]));
+      const targetNodes = new Set();
+      const elements = [];
+
+      // Collect targets
+      for (const node of nodes) {
+        if (!node.edges) continue;
+        node.edges.filter(e => e.attrs?.kind !== '_parent').forEach(e => targetNodes.add(String(e.sink)));
+      }
+
+      // Create elements
+      for (const node of nodes) {
+        const id = String(node.id);
+        const baseName = node.attrs?.name || node.attrs?.type || `Node ${id}`;
+        const nodeType = node.attrs?.type === 'function_definition' && node.attrs?.params?.includes('self') ? 'method' : node.attrs?.type;
+        const icon = ICONS[nodeType] || '';
+        elements.push({ data: { id, label: icon ? `${icon} ${baseName}` : baseName, ...node.attrs }, classes: targetNodes.has(id) ? '' : 'root' });
+
+        if (!node.edges) continue;
+
+        // Sequential edges: calls and if-else (chained by start_row)
+        const seqKinds = ['call', 'if-else'];
+        const seqEdges = node.edges.filter(e => seqKinds.includes(e.attrs?.kind))
+          .map(e => {
+            const target = nodeMap.get(String(e.sink));
+            return { edge: e, startRow: target?.attrs?.start_row ?? 0 };
+          })
+          .sort((a, b) => a.startRow - b.startRow);
+
+        // Chain sequential edges by start_row
+        seqEdges.forEach(({ edge }, i) => {
+          const src = i === 0 ? id : String(seqEdges[i - 1].edge.sink);
+          elements.push({ data: { source: src, target: String(edge.sink), ...edge.attrs } });
+        });
+
+        // Other edges connect directly to parent (branch, method, etc.)
+        node.edges.filter(e => e.attrs?.kind !== '_parent' && !seqKinds.includes(e.attrs?.kind))
+          .forEach(e => {
+            const edgeData = { source: id, target: String(e.sink), ...e.attrs };
+            const cond = nodeMap.get(String(e.sink))?.attrs?.condition;
+            if (cond) edgeData.condition = cond;
+            elements.push({ data: edgeData });
+          });
+      }
+      return elements;
+    }
+
+    function renderGraph() {
+      const nodes = Array.isArray(allGraphData[0]) ? allGraphData.flat() : allGraphData;
+      let filtered = nodes;
+
+      if (selectedFile) {
+        const nodeMap = new Map(nodes.map(n => [String(n.id), n]));
+        const reachable = new Set();
+        const queue = nodes.filter(n => n.attrs?.filename === selectedFile).map(n => String(n.id));
+        queue.forEach(id => reachable.add(id));
+
+        while (queue.length) {
+          const node = nodeMap.get(queue.shift());
+          node?.edges?.forEach(e => {
+            if (e.attrs?.kind !== '_parent' && !reachable.has(String(e.sink))) {
+              reachable.add(String(e.sink));
+              queue.push(String(e.sink));
+            }
+          });
+        }
+        filtered = nodes.filter(n => reachable.has(String(n.id)));
+      }
+
+      cy.elements().remove();
+      cy.add(transformGraph(filtered));
+      cy.layout({ name: 'dagre', rankDir: 'TB', nodeSep: 50, rankSep: 80, padding: 30 })
+        .on('layoutstop', () => { cy.fit(cy.elements(), 50); if (cy.zoom() > 1.5) { cy.zoom(1.5); cy.center(); } })
+        .run();
+    }
+
+    function updateGraph(data) {
+      allGraphData = data;
+      const files = [...new Set((Array.isArray(data[0]) ? data.flat() : data).map(n => n.attrs?.filename).filter(Boolean))].sort();
+      fileSelect.innerHTML = files.map(f => `<option value="${f}" title="${f}">${f.split('/').pop()}</option>`).join('');
+      selectedFile = files.includes(selectedFile) ? selectedFile : files[0];
+      fileSelect.value = selectedFile;
+      renderGraph();
+    }
+
+    fileSelect.onchange = () => { selectedFile = fileSelect.value; renderGraph(); propsEl.innerHTML = '<div class="empty">Click a node to view properties</div>'; };
+
+    // Tooltip handlers
+    const showTooltip = (e, content) => { tooltip.innerHTML = content; tooltip.style.display = 'block'; };
+    const moveTooltip = e => { tooltip.style.left = e.originalEvent.pageX + 10 + 'px'; tooltip.style.top = e.originalEvent.pageY + 10 + 'px'; };
+    const hideTooltip = () => { tooltip.style.display = 'none'; };
+
+    cy.on('mouseover', 'node', e => { const src = e.target.data('src'); if (src) showTooltip(e, `<pre>${highlightPython(src)}</pre>`); });
+    cy.on('mouseover', 'edge', e => { const d = { ...e.target.data() }; delete d.source; delete d.target; delete d.id; if (Object.keys(d).length) showTooltip(e, `<pre>${escapeHtml(JSON.stringify(d, null, 2))}</pre>`); });
+    cy.on('mousemove', 'node, edge', moveTooltip);
+    cy.on('mouseout', 'node, edge', hideTooltip);
+
+    cy.on('tap', 'node', e => {
+      const data = { ...e.target.data() }; delete data.label;
+      const order = ['id', 'type', 'name'];
+      const keys = Object.keys(data).sort((a, b) => a === 'src' ? 1 : b === 'src' ? -1 : (order.indexOf(a) >= 0 ? order.indexOf(a) : 99) - (order.indexOf(b) >= 0 ? order.indexOf(b) : 99) || a.localeCompare(b));
+      propsEl.innerHTML = keys.map(k => {
+        if (k === 'src') return `<div class="prop"><div class="key">${escapeHtml(k)}</div><div class="value code"><button class="copy-btn" title="Copy">⧉</button>${highlightPython(data[k])}</div></div>`;
+        return `<div class="prop"><div class="key">${escapeHtml(k)}</div><div class="value">${escapeHtml(typeof data[k] === 'object' ? JSON.stringify(data[k], null, 2) : data[k])}</div></div>`;
+      }).join('') || '<div class="empty">No properties</div>';
+
+      const copyBtn = propsEl.querySelector('.copy-btn');
+      if (copyBtn) copyBtn.onclick = () => { navigator.clipboard.writeText(data.src); copyBtn.textContent = '✓'; setTimeout(() => copyBtn.textContent = '⧉', 1500); };
+    });
+
+    // WebSocket
+    function connect() {
+      ws = new WebSocket(`ws://${location.host}`);
+      ws.onopen = () => { statusEl.textContent = 'Connected'; statusEl.className = ''; };
+      ws.onmessage = e => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'graph') { updateGraph(msg.data); statusEl.textContent = 'Updated'; setTimeout(() => statusEl.textContent = 'Connected', 1000); if (msg.elapsed != null) showToast(`draveur: ${msg.elapsed}ms`); }
+        else if (msg.type === 'error') { statusEl.textContent = 'Error'; statusEl.className = 'error'; console.error(msg.message); }
+      };
+      ws.onclose = () => { statusEl.textContent = 'Disconnected'; statusEl.className = 'disconnected'; setTimeout(connect, 2000); };
+      ws.onerror = () => ws.close();
+    }
+    connect();
+  </script>
+</body>
+</html>
