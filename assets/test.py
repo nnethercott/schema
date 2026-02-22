@@ -1,22 +1,40 @@
-import time
-def foo(*args):
-    time.sleep(10)
+def foo():
+    if True:
+        pass
+    elif 1==2:
+        pass
+    else:
+        foo()
     pass
 
+@workflows.workflow.define("failing-tool-call-workflow")
+class FailingToolCallWorkflow:
+    @workflows.workflow.entrypoint
+    async def entrypoint(self) -> None:
+        session = await workflows_mistralai.RemoteSession()
 
-def a(b:int, d, c, a:str|None = None, **kwargs):
-    a = foo()
-    b = 10
-    b
-    a()
-    (i for i in range(10))
-    (
-        foo(a())
-    )
-    while True:
-        c = foo()
+        class WebSearchParams(BaseModel):
+            query: str
 
+        class WebSearchResult(BaseModel):
+            result: str
 
-    class Foo():
-        def __init__(self):
-            self.foo = "bar"
+        @workflows.activity(retry_policy_max_attempts=1)
+        async def do_web_search(params: WebSearchParams) -> WebSearchResult:
+            raise ValueError("This is a test error")
+
+        agent = workflows_mistralai.Agent(
+            model="mistral-medium-latest",
+            description="Agent with web search tool",
+            instructions="Follow the user instructions",
+            name="web-search-agent",
+            tools=[do_web_search],
+        )
+        logger.info("Workflow: Running agent")
+        with contextlib.suppress(Exception) as nate:
+            await workflows_mistralai.Runner.run(
+                agent=agent,
+                inputs="Call do_web_search tool with query 'What is the weather today?'",
+                session=session,
+            )
+

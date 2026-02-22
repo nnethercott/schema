@@ -31,6 +31,9 @@ pub enum Error {
     Parse,
 
     #[error(transparent)]
+    Serde(#[from] serde_json::Error),
+
+    #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
 

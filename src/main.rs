@@ -1,30 +1,34 @@
 use draveur::{
-    Result, class_stanzas, decorated_objects, draveur::Draveur, functions_stanzas, lang::Python,
+    Result, class_stanzas, draveur::Draveur, functions_stanzas, lang::Python,
+    query_decorated_classes, query_functions,
 };
 use std::time::Instant;
 
 fn main() -> Result<()> {
     let now = Instant::now();
 
-    let classes = decorated_objects!(
-        // "workflows.workflow.define",
-        // "workflows.update",
-        // "workflows.query",
-        // "workflows.signal",
-        // "activity",
+    let classes = query_decorated_classes!(
+        "workflows.workflow.define",
+        "workflows.update",
+        "workflows.query",
+        "workflows.signal",
+        "workflows.activity",
         "foo"
     );
-    let functions = String::from("((module)) @all");
+    let functions = query_functions!().to_string();
 
-    // let path = "./";
-    let path = "/Users/naten/mistral/dashboard/workflow_sdk/";
-
-    Draveur::<Python>::new()
-        .add(functions.clone(), functions_stanzas!())?
-        // .add(functions, class_stanzas!())?
+    let graphs = Draveur::<Python>::new()
+        .add(functions, functions_stanzas!())?
+        .add(classes, class_stanzas!())?
         .waltz("./")?;
         // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
 
-    println!("{:?}", now.elapsed());
+    let elapsed = now.elapsed();
+
+    for graph in graphs {
+        println!("{}", serde_json::to_string_pretty(&graph)?);
+    }
+
+    println!("{:?}", elapsed);
     Ok(())
 }

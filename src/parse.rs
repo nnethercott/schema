@@ -22,7 +22,7 @@ impl<'a, 'tree> Debug for Noeud<'a, 'tree> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // markdown-flavoured
         f.write_str(&format!(
-            "Lines: {}-{}\n```python\n{}\n```",
+            "Lines: {}-{}\n```\n{}\n```",
             self.node.start_position().row,
             self.node.end_position().row,
             self.ctx_as_str()

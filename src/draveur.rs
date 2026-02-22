@@ -3,6 +3,7 @@ use crate::{
     crawl::{CrawlOpts, Visitor},
     errors::Error,
     lang::Lang,
+    node::{Graph, merge},
     parse::Noeud,
 };
 use ignore::DirEntry;
@@ -100,13 +101,12 @@ where
     }
 
     pub fn add(&mut self, cause: String, effect: String) -> Result<&mut Self> {
-        let cause = L::build_query(cause)?;
-        let effect = L::build_stanzas(effect)?;
-        self.mappings.push((cause, effect));
+        self.mappings
+            .push((L::build_query(cause)?, L::build_stanzas(effect)?));
         Ok(self)
     }
 
-    pub fn waltz(&self, path: &str) -> Result<()> {
+    pub fn waltz(&self, path: &str) -> Result<Vec<Graph>> {
         let tls = ThreadLocal::with_capacity(10);
 
         let (tx, rx) = channel();
@@ -128,11 +128,20 @@ where
             state,
         );
 
-        //consume the queue
+        //consume the queue for ALL files
+        let mut graphs = vec![];
         while let Ok(g) = rx.recv() {
-            // dbg!(g);
+            let graph = Graph::deser(g)?;
+            graphs.push(graph);
         }
-        Ok(())
+
+        // entity linking
+        // TODO: hide behind feature flag
+        // merge(&mut graphs, |leaf, root| {
+        //     leaf.get("src") == root.get("src")
+        // });
+
+        Ok(graphs)
     }
 
     fn parse_file(
@@ -166,9 +175,8 @@ where
             // parse candidate nodes
             let hits = root.parse(cause);
             for hit in hits {
-                // NOTE: this is where recursion would go;
-                // - let mut cur = root, cur = node, self.recursive(n-1, &cur, effect) ...
                 for (_group, node) in &hit {
+                    // dbg!(&node);
                     graphs.push(Self::build_node_graph(node, effect, entry, tls)?);
                 }
             }
@@ -226,10 +234,10 @@ where
 
         let graph = stanzas
             .execute(&node_tree, node.ctx_as_str(), &config, &NoCancellation)
-            .unwrap_or_else(|_| panic!("{}", node.ctx_as_str()));
+            .unwrap_or_else(|e| panic!("{:?}\n{}", e, node.ctx_as_str()));
 
         if graph.node_count() > 0 {
-            println!("{}", graph.pretty_print());
+            // println!("{}", graph.pretty_print());
         }
 
         match graph.node_count() {
