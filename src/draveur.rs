@@ -213,20 +213,13 @@ where
 
         // parse node sub-tree
         let node_tree = {
-            let parser_mutex = tls.get_or_try(|| {
-                let mut p = Parser::new();
-                p.set_language(&L::language())
-                    .map_err(|e| Error::lang::<L>(e))?;
-
-                Ok::<Mutex<Parser>, Error>(Mutex::new(p))
-            })?;
+            // SAFETY: mutex must already exist as this function is run after `Self::parse_file`
+            let parser_mutex = tls.get().unwrap();
             let mut parser = parser_mutex.lock().expect("poisoned");
             parser
                 .parse(node.bytes(), None)
                 .ok_or_else(|| Error::Parse)?
         };
-        // dbg!(node_tree.root_node().to_sexp());
-        // println!("{}\n", node.ctx_as_str());
 
         // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/execution.rs
         let functions = Functions::stdlib();
