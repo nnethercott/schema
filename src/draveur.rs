@@ -3,14 +3,14 @@ use crate::{
     crawl::{CrawlOpts, Visitor},
     errors::Error,
     lang::Lang,
-    node::{Graph},
+    node::Graph,
     parse::Noeud,
 };
+use crossbeam_channel::{Sender, unbounded};
 use ignore::DirEntry;
 use madvise::{AccessPattern, AdviseMemory};
 use memmap2::{Mmap, MmapOptions};
 use std::env;
-use std::sync::mpsc::{Sender, channel};
 use std::thread::available_parallelism;
 use std::{cell::UnsafeCell, marker::PhantomData};
 use std::{fs::File, io::Read, path::Path};
@@ -106,9 +106,10 @@ where
     }
 
     pub fn waltz(&self, path: &str) -> Result<Vec<Graph>> {
-        let tls = ThreadLocal::with_capacity(10);
+        let tls = ThreadLocal::with_capacity(available_threads());
 
-        let (tx, rx) = channel();
+        // FIXME: add backpressure later
+        let (tx, rx) = unbounded();
         let state = State { tx };
 
         let crawler = CrawlOpts::default()
@@ -118,13 +119,11 @@ where
             .build();
 
         crawler.crawl(|e| self.parse_file(e, &tls), state)?;
-
-        //consume the queue for ALL files
-        let mut graphs = vec![];
-        while let Ok(g) = rx.recv() {
-            let graph = Graph::deser(g)?;
-            graphs.push(graph);
-        }
+        let graphs = rx
+            .iter()
+            .map(|item| Graph::deser(item))
+            .flatten()
+            .collect::<Vec<_>>();
 
         // merge(&mut graphs, |leaf, root| leaf.get("src") == root.get("src"));
 
@@ -160,7 +159,7 @@ where
             for (_group, noeud) in root
                 .parse(cause)
                 .flatten()
-                .filter(|(_, node)| node.is_empty())
+                .filter(|(_, node)| !node.is_empty())
             {
                 graphs.push(Self::build_node_graph(&noeud, effect, entry, tls)?);
             }

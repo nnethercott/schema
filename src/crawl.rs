@@ -2,9 +2,9 @@
 //! use ignore Walker with configurable threads
 
 use ignore::{DirEntry, WalkBuilder, WalkState};
-use oneshot::Sender;
+use std::cell::OnceCell;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 
 use crate::Error;
 use crate::lang::Lang;
@@ -59,22 +59,22 @@ impl Default for CrawlOpts {
 
 #[derive(Clone)]
 struct SigTerm<T: Send> {
-    tx: Arc<Mutex<Option<Sender<T>>>>,
+    error: OnceCell<T>,
 }
 
 impl<T: Send> SigTerm<T> {
-    pub fn new(tx: Sender<T>) -> Self {
+    pub fn new() -> Self {
         Self {
-            tx: Arc::new(Mutex::new(Some(tx))),
+            error: OnceCell::new(),
         }
     }
 
-    pub fn notify(&self, msg: T) {
-        if let Some(sender) = self.tx.lock().expect("poisoned").take() {
-            unsafe {
-                sender.send(msg).unwrap_unchecked();
-            }
-        }
+    pub fn get(&self) -> Option<&T> {
+        self.error.get()
+    }
+
+    pub fn set(&self, msg: T) {
+        let _ = self.error.set(msg);
     }
 }
 
@@ -98,8 +98,7 @@ impl Crawler {
         let f = Arc::new(f);
         let visitor = Arc::new(v);
 
-        let (tx, rx) = oneshot::channel();
-        let sigterm = SigTerm::new(tx);
+        let sigterm = SigTerm::new();
 
         WalkBuilder::new(&self.opts.dir)
             .follow_links(false)
@@ -126,7 +125,7 @@ impl Crawler {
                     if is_allowed {
                         match f(&entry) {
                             Ok(res) => visitor.visit(res),
-                            Err(e) => sigterm.notify(e.to_string()),
+                            Err(e) => sigterm.set(e.to_string()),
                         };
                     }
                     WalkState::Continue
@@ -134,7 +133,7 @@ impl Crawler {
             });
 
         // check if error occured during build
-        if let Ok(msg) = rx.try_recv() {
+        if let Some(msg) = sigterm.get() {
             return Err(Error::other(msg));
         }
         Ok(())
