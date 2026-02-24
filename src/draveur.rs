@@ -3,17 +3,17 @@ use crate::{
     crawl::{CrawlOpts, Visitor},
     errors::Error,
     lang::Lang,
-    node::{Graph, merge},
+    node::{Graph},
     parse::Noeud,
 };
 use ignore::DirEntry;
 use madvise::{AccessPattern, AdviseMemory};
 use memmap2::{Mmap, MmapOptions};
 use std::env;
-use std::marker::PhantomData;
 use std::sync::mpsc::{Sender, channel};
 use std::thread::available_parallelism;
-use std::{fs::File, io::Read, path::Path, sync::Mutex};
+use std::{cell::UnsafeCell, marker::PhantomData};
+use std::{fs::File, io::Read, path::Path};
 use thread_local::ThreadLocal;
 use tree_sitter::{Parser, Query};
 use tree_sitter_graph::{
@@ -60,12 +60,11 @@ fn buffered(path: &Path, file_size: usize) -> Result<FileBuffer> {
     // small enough to read into ram
     let mut file = File::open(path).map_err(|e| IoErrorKind::open(path, e))?;
     let mut buf = vec![0; file_size];
-    file.read(&mut buf)
+    file.read_exact(&mut buf)
         .map_err(|e| IoErrorKind::read(path, e))?;
     Ok(FileBuffer::Raw(buf))
 }
 
-// NOTE: either do this or ThreadLocal<Cell<Value>> and iter after
 #[derive(Debug, Clone)]
 struct State {
     // pushes subgraphs from thread to an mpsc queue
@@ -118,15 +117,7 @@ where
             .add_lang::<L>()
             .build();
 
-        crawler.crawl(
-            |e| match self.parse_file(e, &tls) {
-                Ok(res) => res,
-                Err(e) => {
-                    panic!("{:?}", e);
-                }
-            },
-            state,
-        );
+        crawler.crawl(|e| self.parse_file(e, &tls), state)?;
 
         //consume the queue for ALL files
         let mut graphs = vec![];
@@ -135,11 +126,7 @@ where
             graphs.push(graph);
         }
 
-        // entity linking
-        // TODO: hide behind feature flag
-        // merge(&mut graphs, |leaf, root| {
-        //     leaf.get("src") == root.get("src")
-        // });
+        // merge(&mut graphs, |leaf, root| leaf.get("src") == root.get("src"));
 
         Ok(graphs)
     }
@@ -147,38 +134,35 @@ where
     fn parse_file(
         &self,
         entry: &DirEntry,
-        tls: &ThreadLocal<Mutex<Parser>>,
+        tls: &ThreadLocal<UnsafeCell<Parser>>,
     ) -> Result<Vec<Option<serde_json::Value>>> {
         let file_size = entry.metadata()?.len() as usize;
         let buf = buffered(entry.path(), file_size)?;
         let bytes = buf.bytes();
 
-        // parse source file
-        let tree = {
-            let parser_mutex = tls.get_or_try(|| {
-                let mut p = Parser::new();
-                p.set_language(&L::language())
-                    .map_err(|e| Error::lang::<L>(e))?;
+        let parser = tls.get_or_try(|| {
+            let mut p = Parser::new();
+            p.set_language(&L::language())
+                .map_err(|e| Error::lang::<L>(e))?;
 
-                Ok::<Mutex<Parser>, Error>(Mutex::new(p))
-            })?;
+            Ok::<UnsafeCell<Parser>, Error>(UnsafeCell::new(p))
+        })?;
 
-            let mut parser = parser_mutex.lock().expect("poisoned");
-            parser.parse(bytes, None).ok_or_else(|| Error::Parse)?
-        };
+        // SAFETY: we're the only one accessing this parser
+        let parser = unsafe { &mut *parser.get() };
+        let tree = parser.parse(bytes, None).ok_or_else(|| Error::Parse)?;
 
         let root = Noeud::new(tree.root_node(), bytes);
         let mut graphs = vec![];
 
         // iterate over all the capture groups
         for (cause, effect) in &self.mappings {
-            // parse candidate nodes
-            let hits = root.parse(cause);
-            for hit in hits {
-                for (_group, node) in &hit {
-                    // dbg!(&node);
-                    graphs.push(Self::build_node_graph(node, effect, entry, tls)?);
-                }
+            for (_group, noeud) in root
+                .parse(cause)
+                .flatten()
+                .filter(|(_, node)| node.is_empty())
+            {
+                graphs.push(Self::build_node_graph(&noeud, effect, entry, tls)?);
             }
         }
 
@@ -189,7 +173,7 @@ where
         node: &Noeud,
         stanzas: &ast::File,
         entry: &DirEntry,
-        tls: &ThreadLocal<Mutex<Parser>>,
+        tls: &ThreadLocal<UnsafeCell<Parser>>,
     ) -> Result<Option<serde_json::Value>> {
         let mut globals = Variables::new();
         globals
@@ -213,25 +197,20 @@ where
 
         // parse node sub-tree
         let node_tree = {
-            // SAFETY: mutex must already exist as this function is run after `Self::parse_file`
-            let parser_mutex = tls.get().unwrap();
-            let mut parser = parser_mutex.lock().expect("poisoned");
+            // SAFETY: must already exist as this function is run after `Self::parse_file`
+            let parser = tls.get().unwrap();
+            let parser = unsafe { &mut *parser.get() };
             parser
                 .parse(node.bytes(), None)
                 .ok_or_else(|| Error::Parse)?
         };
 
-        // https://github.com/tree-sitter/tree-sitter-graph/blob/main/tests/it/execution.rs
         let functions = Functions::stdlib();
         let config = ExecutionConfig::new(&functions, &globals).lazy(true);
 
         let graph = stanzas
             .execute(&node_tree, node.ctx_as_str(), &config, &NoCancellation)
             .unwrap_or_else(|e| panic!("{:?}\n{}", e, node.ctx_as_str()));
-
-        if graph.node_count() > 0 {
-            // println!("{}", graph.pretty_print());
-        }
 
         match graph.node_count() {
             0 => Ok(None),

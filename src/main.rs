@@ -20,15 +20,14 @@ fn main() -> Result<()> {
     let graphs = Draveur::<Python>::new()
         .add(functions, functions_stanzas!())?
         .add(classes, class_stanzas!())?
-        .waltz("./")?;
-        // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
+        .waltz("/Users/nathaniel.nethercott/mistral/dashboard/nate/workflow_sdk/")?;
 
     let elapsed = now.elapsed();
 
-    for graph in graphs {
-        println!("{}", serde_json::to_string_pretty(&graph)?);
-    }
-
+    // for graph in graphs {
+    //     println!("{}", serde_json::to_string_pretty(&graph)?);
+    // }
+    //
     // println!("{:?}", elapsed);
     Ok(())
 }

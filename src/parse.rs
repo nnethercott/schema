@@ -55,6 +55,10 @@ impl<'a, 'tree> Noeud<'a, 'tree> {
         }
         .build()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.src.is_empty()
+    }
 }
 
 #[self_referencing]

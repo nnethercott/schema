@@ -94,6 +94,7 @@ dependencies = [
  "ignore",
  "madvise",
  "memmap2",
+ "oneshot",
  "ouroboros",
  "roaring",
  "serde",
@@ -188,6 +189,12 @@ checksum = "744133e4a0e0a658e1374cf3bf8e415c4052a15a111acd372764c55b4177d490"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "oneshot"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfe21416a02c693fb9f980befcb230ecc70b0b3d1cc4abf88b9675c4c1457f0c"
 
 [[package]]
 name = "ouroboros"
