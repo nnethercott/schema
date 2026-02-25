@@ -22,14 +22,6 @@ fn main() -> Result<()> {
         .add(functions, functions_stanzas!())?
         .add(classes, class_stanzas!())?
         .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
-        // .waltz("/Users/naten/coding/rust/draveur/")?;
-
-    for item in &graphs{
-        for node in item.iter(){
-            let n = node.clone();
-            n.is_leaf();
-        }
-    }
 
     let elapsed = now.elapsed();
 
