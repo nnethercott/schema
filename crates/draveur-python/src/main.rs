@@ -1,7 +1,8 @@
-use draveur::{
-    Result, class_stanzas, draveur::Draveur, functions_stanzas, lang::Python,
-    query_decorated_classes, query_functions,
+use draveur_python::{
+    Python, class_stanzas, functions_stanzas, query_decorated_classes, query_functions,
 };
+
+use draveur::{Result, draveur::Draveur};
 use std::time::Instant;
 
 fn main() -> Result<()> {
@@ -24,9 +25,9 @@ fn main() -> Result<()> {
 
     let elapsed = now.elapsed();
 
-    for graph in graphs {
-        println!("{}", serde_json::to_string_pretty(&graph)?);
-    }
+    // for graph in graphs {
+    //     println!("{}", serde_json::to_string_pretty(&graph)?);
+    // }
 
     println!("{:?}", elapsed);
     Ok(())
