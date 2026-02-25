@@ -8,6 +8,7 @@ path = "./src/lib.rs"
 
 [dependencies]
 anyhow = "1.0.101"
+crossbeam-channel = "0.5.15"
 ignore = { version = "0.4.25", features=["simd-accel"] }
 madvise = "0.1.0"
 memmap2 = "0.9.9"

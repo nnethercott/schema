@@ -20,8 +20,7 @@ fn main() -> Result<()> {
     let graphs = Draveur::<Python>::new()
         .add(functions, functions_stanzas!())?
         .add(classes, class_stanzas!())?
-        .waltz("./")?;
-        // .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
+        .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
 
     let elapsed = now.elapsed();
 
@@ -29,6 +28,6 @@ fn main() -> Result<()> {
         println!("{}", serde_json::to_string_pretty(&graph)?);
     }
 
-    // println!("{:?}", elapsed);
+    println!("{:?}", elapsed);
     Ok(())
 }

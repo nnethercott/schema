@@ -44,6 +44,10 @@ impl Error {
             language: L::NAME.into(),
         }
     }
+
+    pub fn other(msg: impl Into<String>) -> Self {
+        Self::Other(anyhow::anyhow!(msg.into()))
+    }
 }
 
 #[derive(Error, Debug)]

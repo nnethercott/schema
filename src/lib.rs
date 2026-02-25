@@ -6,4 +6,4 @@ pub mod macros;
 pub mod parse;
 pub mod node;
 
-pub use errors::{IoErrorKind, Result, TreeSitterError};
+pub use errors::{IoErrorKind, Result, TreeSitterError, Error};

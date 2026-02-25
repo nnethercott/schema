@@ -2,9 +2,11 @@
 //! use ignore Walker with configurable threads
 
 use ignore::{DirEntry, WalkBuilder, WalkState};
+use std::cell::OnceCell;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc};
 
+use crate::Error;
 use crate::lang::Lang;
 
 pub trait Visitor: Send + Sync {
@@ -55,6 +57,27 @@ impl Default for CrawlOpts {
     }
 }
 
+#[derive(Clone)]
+struct SigTerm<T: Send> {
+    error: OnceCell<T>,
+}
+
+impl<T: Send> SigTerm<T> {
+    pub fn new() -> Self {
+        Self {
+            error: OnceCell::new(),
+        }
+    }
+
+    pub fn get(&self) -> Option<&T> {
+        self.error.get()
+    }
+
+    pub fn set(&self, msg: T) {
+        let _ = self.error.set(msg);
+    }
+}
+
 pub(crate) struct Crawler {
     opts: Arc<CrawlOpts>,
 }
@@ -66,14 +89,16 @@ impl Crawler {
         }
     }
 
-    pub fn crawl<F, V, I>(&self, f: F, v: V)
+    pub fn crawl<F, V, I>(&self, f: F, v: V) -> crate::Result<()>
     where
-        F: Fn(&DirEntry) -> I + Send + Sync,
+        F: Fn(&DirEntry) -> crate::Result<I> + Send + Sync,
         V: Visitor<Item = I>,
     {
         let opts = Arc::clone(&self.opts);
         let f = Arc::new(f);
         let visitor = Arc::new(v);
+
+        let sigterm = SigTerm::new();
 
         WalkBuilder::new(&self.opts.dir)
             .follow_links(false)
@@ -84,6 +109,8 @@ impl Crawler {
                 let opts = Arc::clone(&opts);
                 let f = Arc::clone(&f);
                 let visitor = Arc::clone(&visitor);
+                let sigterm = sigterm.clone();
+
                 Box::new(move |result| {
                     let Ok(entry) = result else {
                         return WalkState::Continue;
@@ -96,10 +123,19 @@ impl Crawler {
                         .is_some_and(|ext| opts.allowed_exts.iter().any(|a| a == ext));
 
                     if is_allowed {
-                        visitor.visit(f(&entry));
+                        match f(&entry) {
+                            Ok(res) => visitor.visit(res),
+                            Err(e) => sigterm.set(e.to_string()),
+                        };
                     }
                     WalkState::Continue
                 })
             });
+
+        // check if error occured during build
+        if let Some(msg) = sigterm.get() {
+            return Err(Error::other(msg));
+        }
+        Ok(())
     }
 }
