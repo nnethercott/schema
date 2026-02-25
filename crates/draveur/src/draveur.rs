@@ -3,7 +3,7 @@ use crate::{
     crawl::{CrawlOpts, Visitor},
     errors::Error,
     lang::Lang,
-    node::Graph,
+    types::Graph,
     parse::Noeud,
 };
 use crossbeam_channel::{Sender, unbounded};

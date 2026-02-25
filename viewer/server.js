@@ -12,7 +12,7 @@ if (!watchDir) {
 }
 
 const resolvedWatchDir = path.resolve(watchDir);
-const draveurBin = path.resolve(__dirname, '../target/release/draveur');
+const draveurBin = path.resolve(__dirname, '../target/release/draveur-python');
 
 let latestGraph = null, lastElapsed = null;
 

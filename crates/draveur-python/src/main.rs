@@ -1,7 +1,8 @@
-use draveur::{
-    Result, class_stanzas, draveur::Draveur, functions_stanzas, lang::Python,
-    query_decorated_classes, query_functions,
+use draveur_python::{
+    Python, class_stanzas, functions_stanzas, query_decorated_classes, query_functions,
 };
+
+use draveur::{Result, draveur::Draveur};
 use std::time::Instant;
 
 fn main() -> Result<()> {
@@ -21,12 +22,20 @@ fn main() -> Result<()> {
         .add(functions, functions_stanzas!())?
         .add(classes, class_stanzas!())?
         .waltz("/Users/naten/mistral/dashboard/workflow_sdk/")?;
+        // .waltz("/Users/naten/coding/rust/draveur/")?;
+
+    for item in &graphs{
+        for node in item.iter(){
+            let n = node.clone();
+            n.is_leaf();
+        }
+    }
 
     let elapsed = now.elapsed();
 
-    for graph in graphs {
-        println!("{}", serde_json::to_string_pretty(&graph)?);
-    }
+    // for graph in graphs {
+    //     println!("{}", serde_json::to_string_pretty(&graph)?);
+    // }
 
     println!("{:?}", elapsed);
     Ok(())

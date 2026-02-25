@@ -81,14 +81,12 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Edge {
     sink: NodeId,
     attrs: Attributes,
 }
 
-#[allow(dead_code)]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Node {
     id: NodeId,
@@ -171,41 +169,39 @@ impl Graph {
     }
 }
 
-macro_rules! edge {
-    ($sink:expr => $(($label:literal,$value:expr)),+ ) => {
-        {
-            let mut attrs: HashMap<String, Value> = HashMap::new();
-            $(
-                attrs.insert(format!("{}", $label), Value::from($value));
-            )*
-            Edge {
-                sink: $sink,
-                attrs,
-            }
-        }
-    };
-}
-
-pub fn merge<R>(graphs: &mut [Graph], refers_to: R)
-where
-    R: Fn(&Node, &Node) -> bool,
-{
-    // lookup table
-    let root_nodes: Vec<Node> = graphs
-        .iter()
-        .filter_map(|g| g.root().map(|n| n.clone()))
-        .collect();
-
-    // FIXME: O(n^3) ://
-    // observe: each graph can be processed independently
-    for g in graphs.iter_mut() {
-        for leaf in g.iter_leafs_mut() {
-            for node in &root_nodes {
-                if refers_to(leaf, node) {
-                    // add some check on if node.id in g.ids()
-                    leaf.edges.push(edge!(node.id => ("foreign", true)));
-                }
-            }
-        }
-    }
-}
+// macro_rules! edge {
+//     ($sink:expr => $(($label:literal,$value:expr)),+ ) => {
+//         {
+//             let mut attrs: HashMap<String, Value> = HashMap::new();
+//             $(
+//                 attrs.insert(format!("{}", $label), Value::from($value));
+//             )*
+//             Edge {
+//                 sink: $sink,
+//                 attrs,
+//             }
+//         }
+//     };
+// }
+// pub fn merge<R>(graphs: &mut [Graph], refers_to: R)
+// where
+//     R: Fn(&Node, &Node) -> bool,
+// {
+//     // lookup table
+//     let root_nodes: Vec<Node> = graphs
+//         .iter()
+//         .filter_map(|g| g.root().map(|n| n.clone()))
+//         .collect();
+//
+//     // observe: each graph can be processed independently
+//     for g in graphs.iter_mut() {
+//         for leaf in g.iter_leafs_mut() {
+//             for node in &root_nodes {
+//                 if refers_to(leaf, node) {
+//                     // add some check on if node.id in g.ids()
+//                     leaf.edges.push(edge!(node.id => ("foreign", true)));
+//                 }
+//             }
+//         }
+//     }
+// }
