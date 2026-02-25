@@ -1,0 +1,179 @@
+[
+  {
+    "id": 0,
+    "edges": [
+      {
+        "sink": 1,
+        "attrs": {
+          "kind": "method"
+        }
+      }
+    ],
+    "attrs": {
+      "filename": "/Users/naten/coding/rust/draveur/assets/test.py",
+      "start_row": 24,
+      "type": "class_definition",
+      "name": "FailingToolCallWorkflow",
+      "start_col": 0,
+      "decorator": "workflows.workflow.define",
+      "end_col": 13,
+      "src": "class FailingToolCallWorkflow:\n    @workflows.workflow.entrypoint\n    async def entrypoint(self) -> None:\n        session = await workflows_mistralai.RemoteSession()\n\n        class WebSearchParams(BaseModel):\n            query: str\n\n        class WebSearchResult(BaseModel):\n            result: str\n\n        @workflows.activity(retry_policy_max_attempts=1)\n        async def do_web_search(params: WebSearchParams) -> WebSearchResult:\n            raise ValueError(\"This is a test error\")\n\n        agent = workflows_mistralai.Agent(\n            model=\"mistral-medium-latest\",\n            description=\"Agent with web search tool\",\n            instructions=\"Follow the user instructions\",\n            name=\"web-search-agent\",\n            tools=[do_web_search],\n        )\n        logger.info(\"Workflow: Running agent\")\n        with contextlib.suppress(Exception) as nate:\n            await workflows_mistralai.Runner.run(\n                agent=agent,\n                inputs=\"Call do_web_search tool with query 'What is the weather today?'\",\n                session=session,\n            )",
+      "end_row": 52
+    }
+  },
+  {
+    "id": 1,
+    "edges": [
+      {
+        "sink": 0,
+        "attrs": {
+          "kind": "_parent"
+        }
+      },
+      {
+        "sink": 2,
+        "attrs": {
+          "kind": "call"
+        }
+      },
+      {
+        "sink": 5,
+        "attrs": {
+          "kind": "call"
+        }
+      },
+      {
+        "sink": 6,
+        "attrs": {
+          "kind": "call"
+        }
+      },
+      {
+        "sink": 7,
+        "attrs": {
+          "kind": "call"
+        }
+      }
+    ],
+    "attrs": {
+      "src": "async def entrypoint(self) -> None:\n        session = await workflows_mistralai.RemoteSession()\n\n        class WebSearchParams(BaseModel):\n            query: str\n\n        class WebSearchResult(BaseModel):\n            result: str\n\n        @workflows.activity(retry_policy_max_attempts=1)\n        async def do_web_search(params: WebSearchParams) -> WebSearchResult:\n            raise ValueError(\"This is a test error\")\n\n        agent = workflows_mistralai.Agent(\n            model=\"mistral-medium-latest\",\n            description=\"Agent with web search tool\",\n            instructions=\"Follow the user instructions\",\n            name=\"web-search-agent\",\n            tools=[do_web_search],\n        )\n        logger.info(\"Workflow: Running agent\")\n        with contextlib.suppress(Exception) as nate:\n            await workflows_mistralai.Runner.run(\n                agent=agent,\n                inputs=\"Call do_web_search tool with query 'What is the weather today?'\",\n                session=session,\n            )",
+      "end_row": 52,
+      "returns": "None",
+      "end_col": 13,
+      "type": "function_definition",
+      "start_row": 26,
+      "name": "entrypoint",
+      "decorator": "workflows.workflow.entrypoint",
+      "start_col": 4,
+      "params": "(self)"
+    }
+  },
+  {
+    "id": 2,
+    "edges": [
+      {
+        "sink": 1,
+        "attrs": {
+          "kind": "_parent"
+        }
+      }
+    ],
+    "attrs": {
+      "end_col": 59,
+      "end_row": 27,
+      "start_row": 27,
+      "type": "call",
+      "name": "workflows_mistralai.RemoteSession",
+      "src": "workflows_mistralai.RemoteSession()",
+      "start_col": 24
+    }
+  },
+  {
+    "id": 3,
+    "edges": [],
+    "attrs": {
+      "type": "class_definition",
+      "src": "class WebSearchParams(BaseModel):\n            query: str",
+      "name": "WebSearchParams",
+      "filename": "/Users/naten/coding/rust/draveur/assets/test.py",
+      "start_row": 29,
+      "end_row": 30,
+      "end_col": 22,
+      "start_col": 8
+    }
+  },
+  {
+    "id": 4,
+    "edges": [],
+    "attrs": {
+      "end_row": 33,
+      "end_col": 23,
+      "start_row": 32,
+      "start_col": 8,
+      "src": "class WebSearchResult(BaseModel):\n            result: str",
+      "filename": "/Users/naten/coding/rust/draveur/assets/test.py",
+      "name": "WebSearchResult",
+      "type": "class_definition"
+    }
+  },
+  {
+    "id": 5,
+    "edges": [
+      {
+        "sink": 1,
+        "attrs": {
+          "kind": "_parent"
+        }
+      }
+    ],
+    "attrs": {
+      "type": "call",
+      "end_col": 9,
+      "name": "workflows_mistralai.Agent",
+      "src": "workflows_mistralai.Agent(\n            model=\"mistral-medium-latest\",\n            description=\"Agent with web search tool\",\n            instructions=\"Follow the user instructions\",\n            name=\"web-search-agent\",\n            tools=[do_web_search],\n        )",
+      "start_col": 16,
+      "start_row": 39,
+      "end_row": 45
+    }
+  },
+  {
+    "id": 6,
+    "edges": [
+      {
+        "sink": 1,
+        "attrs": {
+          "kind": "_parent"
+        }
+      }
+    ],
+    "attrs": {
+      "name": "logger.info",
+      "src": "logger.info(\"Workflow: Running agent\")",
+      "start_row": 46,
+      "type": "call",
+      "end_row": 46,
+      "start_col": 8,
+      "end_col": 46
+    }
+  },
+  {
+    "id": 7,
+    "edges": [
+      {
+        "sink": 1,
+        "attrs": {
+          "kind": "_parent"
+        }
+      }
+    ],
+    "attrs": {
+      "end_col": 13,
+      "name": "workflows_mistralai.Runner.run",
+      "src": "workflows_mistralai.Runner.run(\n                agent=agent,\n                inputs=\"Call do_web_search tool with query 'What is the weather today?'\",\n                session=session,\n            )",
+      "start_col": 18,
+      "start_row": 48,
+      "type": "call",
+      "end_row": 52
+    }
+  }
+]

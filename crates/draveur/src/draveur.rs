@@ -119,6 +119,7 @@ where
             .build();
 
         crawler.crawl(|e| self.parse_file(e, &tls), state)?;
+
         let graphs = rx
             .iter()
             .map(|item| Graph::deser(item))
